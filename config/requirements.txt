@@ -1,0 +1,32 @@
+# Bitcoin Lightning Vending Machine - Raspberry Pi Dependencies
+# Core dependencies for production deployment on Raspberry Pi
+
+# Web requests for BTCPay Server API
+requests>=2.31.0
+
+# QR code generation
+qrcode[pil]>=7.4.2
+
+# Image processing
+Pillow>=10.0.0
+
+# GPIO control (Raspberry Pi specific)
+RPi.GPIO>=0.7.1
+
+# SPI interface for LCD
+spidev>=3.6
+
+# Serial communication for MDB
+pyserial>=3.5
+
+# Display support
+pygame>=2.5.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# HTTP server for webhooks (optional)
+flask>=2.3.0
+
+# Logging
+colorlog>=6.7.0 

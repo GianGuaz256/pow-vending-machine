@@ -1,0 +1,32 @@
+# Bitcoin Lightning Vending Machine - Mac Development Dependencies
+# Dependencies for development and testing on macOS (no hardware-specific libs)
+
+# Web requests for BTCPay Server API
+requests>=2.31.0
+
+# QR code generation  
+qrcode[pil]>=7.4.2
+
+# Image processing
+Pillow>=10.0.0
+
+# Display support (works on Mac via X11/XQuartz)
+pygame>=2.5.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# GUI for simulator
+tkinter; python_version>="3.0"
+
+# HTTP server for webhooks (optional)
+flask>=2.3.0
+
+# Logging
+colorlog>=6.7.0
+
+# Development and testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Note: Hardware-specific dependencies (RPi.GPIO, spidev) are excluded for Mac compatibility 

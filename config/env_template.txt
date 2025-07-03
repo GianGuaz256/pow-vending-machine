@@ -1,0 +1,30 @@
+# Bitcoin Lightning Vending Machine - Environment Configuration Template
+# Copy this file to .env in the project root and fill in your values
+
+# BTCPay Server Configuration
+BTCPAY_SERVER_URL=https://your-btcpay-server.com
+BTCPAY_STORE_ID=your-store-id-here
+BTCPAY_API_KEY=your-api-key-here
+BTCPAY_WEBHOOK_SECRET=your-webhook-secret-here
+
+# Vending Machine Settings
+VENDING_CURRENCY=EUR
+VENDING_MIN_PRICE=0.50
+VENDING_MAX_PRICE=100.00
+
+# Hardware Configuration
+MDB_SERIAL_PORT=/dev/ttyAMA0
+MDB_BAUD_RATE=9600
+
+# Display Configuration  
+DISPLAY_WIDTH=320
+DISPLAY_HEIGHT=480
+DISPLAY_ROTATION=90
+
+# Logging
+LOG_LEVEL=INFO
+LOG_FILE=/var/log/vending_machine.log
+
+# System Configuration
+PAYMENT_TIMEOUT=300
+STATUS_CHECK_INTERVAL=10 
