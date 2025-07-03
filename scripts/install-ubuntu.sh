@@ -41,7 +41,8 @@ if [[ $EUID -eq 0 ]]; then
 fi
 
 # Check sudo privileges
-if ! sudo -n true 2>/dev/null; then
+log "Testing sudo access..."
+if ! sudo -v; then
     error_exit "This script requires sudo privileges. Please ensure you can run sudo commands."
 fi
 
