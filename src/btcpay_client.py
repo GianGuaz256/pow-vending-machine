@@ -9,7 +9,7 @@ import threading
 from typing import Optional, Dict, Any, Callable
 from enum import Enum
 import logging
-from .config import config
+from config import config
 
 logger = logging.getLogger(__name__)
 

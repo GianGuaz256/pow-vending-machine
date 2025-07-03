@@ -8,7 +8,7 @@ import threading
 import logging
 from typing import Optional, Dict, Any
 from enum import Enum
-from .config import config
+from config import config
 
 logger = logging.getLogger(__name__)
 

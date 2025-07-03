@@ -13,11 +13,14 @@ Pillow>=10.0.0
 # Display support (works on Mac via X11/XQuartz)
 pygame>=2.5.0
 
+# Serial communication for MDB (for testing)
+pyserial>=3.5
+
 # Environment variables
 python-dotenv>=1.0.0
 
-# GUI for simulator
-tkinter; python_version>="3.0"
+# GUI for simulator (built into Python, no need to install)
+# tkinter is included with Python standard library
 
 # HTTP server for webhooks (optional)
 flask>=2.3.0

@@ -7,13 +7,15 @@ import os
 import time
 import logging
 
-# Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+# Add project root and src to path for imports
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+sys.path.insert(0, os.path.join(project_root, 'src'))
 
-from src.config import config
-from src.lcd_display import LCDDisplay
-from src.mdb_controller import MDBController
-from src.btcpay_client import BTCPayClient
+from config import config
+from lcd_display import LCDDisplay
+from mdb_controller import MDBController
+from btcpay_client import BTCPayClient
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

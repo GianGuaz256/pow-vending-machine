@@ -10,10 +10,10 @@ import sys
 from typing import Optional, Dict, Any
 from enum import Enum
 
-from .config import config
-from .lcd_display import LCDDisplay
-from .mdb_controller import MDBController, VendState
-from .btcpay_client import BTCPayClient, InvoiceStatus
+from config import config
+from lcd_display import LCDDisplay
+from mdb_controller import MDBController, VendState
+from btcpay_client import BTCPayClient, InvoiceStatus
 
 # Set up logging
 logging.basicConfig(
