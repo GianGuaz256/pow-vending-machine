@@ -8,13 +8,29 @@ set -e
 echo "Bitcoin Lightning Vending Machine - Installation Script"
 echo "======================================================="
 
-# Check if running on Raspberry Pi
-if ! grep -q "Raspberry Pi" /proc/cpuinfo 2>/dev/null; then
-    echo "Warning: This script is designed for Raspberry Pi"
-    read -p "Continue anyway? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 1
+# Fix locale issues
+export LC_ALL=C
+export LANG=C
+
+# Check if running on Raspberry Pi or Raspberry Pi OS
+if ! grep -q "Raspberry Pi" /proc/cpuinfo 2>/dev/null && ! grep -q "BCM" /proc/cpuinfo 2>/dev/null; then
+    # Also check for Raspberry Pi OS via os-release
+    if [ -f /etc/os-release ]; then
+        if ! grep -q -E "(raspbian|raspberry)" /etc/os-release 2>/dev/null; then
+            echo "Warning: This script is designed for Raspberry Pi"
+            read -p "Continue anyway? (y/N): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                exit 1
+            fi
+        fi
+    else
+        echo "Warning: This script is designed for Raspberry Pi"
+        read -p "Continue anyway? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
     fi
 fi
 
@@ -29,6 +45,7 @@ sudo apt install -y \
     python3 \
     python3-pip \
     python3-venv \
+    python3-dev \
     git \
     libffi-dev \
     libssl-dev \
@@ -37,16 +54,31 @@ sudo apt install -y \
     libfreetype6-dev \
     liblcms2-dev \
     libopenjp2-7 \
-    libtiff5 \
+    libtiff6 \
+    libtiff-dev \
     libatlas-base-dev \
     libxcb1-dev \
     pkg-config \
-    build-essential
+    build-essential \
+    libwebp-dev \
+    libsdl2-dev \
+    libsdl2-image-dev \
+    libsdl2-mixer-dev \
+    libsdl2-ttf-dev \
+    libportmidi-dev \
+    libswscale-dev \
+    libavformat-dev \
+    libavcodec-dev
 
 # Enable SPI and UART interfaces
 echo "Enabling SPI and UART interfaces..."
-sudo raspi-config nonint do_spi 0
-sudo raspi-config nonint do_serial 0
+# Check if raspi-config is available
+if command -v raspi-config &> /dev/null; then
+    sudo raspi-config nonint do_spi 0
+    sudo raspi-config nonint do_serial 0
+else
+    echo "raspi-config not found, please enable SPI and UART manually"
+fi
 
 # Create virtual environment
 echo "Creating Python virtual environment..."
@@ -115,12 +147,22 @@ sudo usermod -a -G dialout $USER
 
 # Configure display settings
 echo "Configuring display settings..."
-if ! grep -q "dtparam=spi=on" /boot/config.txt; then
-    echo "dtparam=spi=on" | sudo tee -a /boot/config.txt
+# Check for both possible config locations
+CONFIG_FILE="/boot/config.txt"
+if [ ! -f "$CONFIG_FILE" ] && [ -f "/boot/firmware/config.txt" ]; then
+    CONFIG_FILE="/boot/firmware/config.txt"
 fi
 
-if ! grep -q "enable_uart=1" /boot/config.txt; then
-    echo "enable_uart=1" | sudo tee -a /boot/config.txt
+if [ -f "$CONFIG_FILE" ]; then
+    if ! grep -q "dtparam=spi=on" "$CONFIG_FILE"; then
+        echo "dtparam=spi=on" | sudo tee -a "$CONFIG_FILE"
+    fi
+
+    if ! grep -q "enable_uart=1" "$CONFIG_FILE"; then
+        echo "enable_uart=1" | sudo tee -a "$CONFIG_FILE"
+    fi
+else
+    echo "Warning: Could not find boot config file. Please enable SPI and UART manually."
 fi
 
 # Test installation
