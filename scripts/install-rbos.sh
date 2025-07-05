@@ -2,6 +2,11 @@
 
 # Bitcoin Lightning Vending Machine Installation Script
 # For Raspberry Pi 5 with Waveshare LCD and Qibixx MDB Pi HAT
+#
+# NOTE: For cleaner installation, consider using the simplified scripts:
+#   - install-minimal.sh: Minimal dependencies, LCD setup separate
+#   - fix-lcd-64bit.sh: Fix architecture issues on 64-bit OS
+# See guides/SIMPLIFIED_INSTALL.md for details
 
 set -e
 
@@ -41,34 +46,26 @@ sudo apt upgrade -y
 
 # Install system dependencies
 echo "Installing system dependencies..."
+# Core Python requirements
 sudo apt install -y \
     python3 \
     python3-pip \
     python3-venv \
     python3-dev \
     git \
-    libffi-dev \
-    libssl-dev \
-    libjpeg-dev \
-    zlib1g-dev \
-    libfreetype6-dev \
-    liblcms2-dev \
-    libopenjp2-7 \
-    libtiff6 \
-    libtiff-dev \
-    libatlas-base-dev \
-    libxcb1-dev \
-    pkg-config \
-    build-essential \
-    libwebp-dev \
+    build-essential
+
+# Pygame dependencies (required for LCD display via pygame)
+# Note: These are needed because the LCD code uses pygame
+echo "Installing display dependencies for pygame..."
+sudo apt install -y \
     libsdl2-dev \
     libsdl2-image-dev \
-    libsdl2-mixer-dev \
     libsdl2-ttf-dev \
+    libfreetype6-dev \
+    libjpeg-dev \
     libportmidi-dev \
-    libswscale-dev \
-    libavformat-dev \
-    libavcodec-dev
+    python3-pygame
 
 # Enable SPI and UART interfaces
 echo "Enabling SPI and UART interfaces..."
