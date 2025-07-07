@@ -21,7 +21,7 @@ class DisplayConfig:
 class MDBConfig:
     """MDB board configuration"""
     serial_port: str = "/dev/ttyAMA0"
-    baud_rate: int = 9600
+    baud_rate: int = 115200  # Qibixx MDB Pi HAT uses 115200 baud
     timeout: float = 1.0
     retry_attempts: int = 3
     

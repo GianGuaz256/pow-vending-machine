@@ -14,7 +14,7 @@ VENDING_MAX_PRICE=100.00
 
 # Hardware Configuration
 MDB_SERIAL_PORT=/dev/ttyAMA0
-MDB_BAUD_RATE=9600
+MDB_BAUD_RATE=115200
 
 # Display Configuration  
 DISPLAY_WIDTH=320

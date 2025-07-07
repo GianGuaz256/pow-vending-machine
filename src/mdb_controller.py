@@ -48,13 +48,15 @@ class MDBController:
     def initialize(self) -> bool:
         """Initialize MDB connection"""
         try:
+            # Qibixx MDB Pi HAT serial parameters:
+            # Baudrate: 115200, Parity: None, Data Bits: 8, Stop Bits: 1
             self.serial_port = serial.Serial(
                 port=config.mdb.serial_port,
-                baudrate=config.mdb.baud_rate,
+                baudrate=config.mdb.baud_rate,  # 115200 for Qibixx MDB Pi HAT
                 timeout=config.mdb.timeout,
-                bytesize=serial.EIGHTBITS,  # Use 8-bit, handle 9th bit in software
-                parity=serial.PARITY_NONE,
-                stopbits=serial.STOPBITS_ONE
+                bytesize=serial.EIGHTBITS,     # 8 data bits
+                parity=serial.PARITY_NONE,     # No parity
+                stopbits=serial.STOPBITS_ONE   # 1 stop bit
             )
             
             # Test connection
@@ -290,7 +292,7 @@ class MDBController:
     def get_status(self) -> Dict[str, Any]:
         """Get current MDB status"""
         return {
-            'state': self.state.value,
+            'state': self.state.value if self.state else 'unknown',
             'is_connected': self.is_connected,
             'last_activity': time.time(),
             'session_data': self.session_data.copy() if self.session_data else {}
