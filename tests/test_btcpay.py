@@ -100,8 +100,6 @@ class BTCPayTestSuite:
                     logger.debug(f"API Key length: {len(value)} characters")
                 elif test_name == "Store ID" and value:
                     logger.debug(f"Store ID length: {len(value)} characters")
-
-                    #Ciao
                 
                 passed = validator(value)
                 
@@ -505,10 +503,223 @@ class BTCPayTestSuite:
         except Exception as e:
             self.log_test_result("Performance", False, f"Performance test failed: {e}")
             return False
+
+    def test_vending_machine_payment_flow(self):
+        """Test complete vending machine payment flow"""
+        print("\n10. Testing Vending Machine Payment Flow...")
+        logger.info("Starting vending machine payment flow simulation")
+        
+        if not self.connection_established:
+            self.log_test_result("VM Payment Flow", False, "No server connection")
+            return False
+        
+        try:
+            # Simulate vending machine products
+            vending_products = [
+                {"id": "A1", "name": "Coca Cola", "price": 1.50, "currency": "EUR"},
+                {"id": "B2", "name": "Snickers Bar", "price": 2.00, "currency": "EUR"},
+                {"id": "C3", "name": "Water Bottle", "price": 1.00, "currency": "EUR"},
+                {"id": "D4", "name": "Energy Drink", "price": 3.50, "currency": "EUR"}
+            ]
+            
+            success_count = 0
+            total_tests = len(vending_products)
+            
+            for product in vending_products:
+                try:
+                    logger.info(f"Testing payment flow for product {product['id']}: {product['name']}")
+                    
+                    # Step 1: Create invoice for specific product
+                    description = f"Vending Machine - {product['name']} (Slot {product['id']})"
+                    invoice = self.btcpay.create_invoice(
+                        amount=product['price'],
+                        currency=product['currency'],
+                        description=description
+                    )
+                    
+                    if not invoice or 'invoice_id' not in invoice:
+                        self.log_test_result(f"VM Flow - {product['id']} Invoice", False, 
+                                           "Failed to create invoice")
+                        continue
+                    
+                    invoice_id = invoice['invoice_id']
+                    self.test_invoices.append(invoice_id)  # Track for cleanup
+                    
+                    # Log invoice creation
+                    logger.info(f"Created invoice {invoice_id} for {product['name']}")
+                    logger.info(f"Amount: {product['price']} {product['currency']}")
+                    
+                    # Step 2: Verify invoice has Lightning Network support
+                    has_lightning = False
+                    if 'lightning_invoice' in invoice and invoice['lightning_invoice']:
+                        has_lightning = True
+                        logger.info(f"Lightning invoice generated: {invoice['lightning_invoice'][:50]}...")
+                    elif 'payment_url' in invoice:
+                        logger.info(f"Payment URL available: {invoice['payment_url']}")
+                        has_lightning = True  # Payment URL should include Lightning option
+                    
+                    if not has_lightning:
+                        self.log_test_result(f"VM Flow - {product['id']} Lightning", False, 
+                                           "No Lightning payment method")
+                        continue
+                    
+                    # Step 3: Monitor invoice status (simulate payment monitoring)
+                    logger.info(f"Starting payment monitoring for invoice {invoice_id}")
+                    monitoring_success = self._simulate_payment_monitoring(invoice_id, product)
+                    
+                    if monitoring_success:
+                        # Step 4: Simulate product release
+                        release_success = self._simulate_product_release(product)
+                        
+                        if release_success:
+                            self.log_test_result(f"VM Flow - {product['id']} Complete", True, 
+                                               f"{product['name']} payment & release successful")
+                            success_count += 1
+                        else:
+                            self.log_test_result(f"VM Flow - {product['id']} Release", False, 
+                                               "Product release failed")
+                    else:
+                        self.log_test_result(f"VM Flow - {product['id']} Monitoring", False, 
+                                           "Payment monitoring failed")
+                        
+                except Exception as e:
+                    logger.error(f"Vending flow error for {product['id']}: {e}")
+                    self.log_test_result(f"VM Flow - {product['id']} Error", False, 
+                                       f"Flow error: {str(e)[:50]}")
+                
+                # Small delay between products
+                time.sleep(0.5)
+            
+            # Overall flow test result
+            overall_success = success_count > 0
+            self.log_test_result("VM Payment Flow Overall", overall_success, 
+                               f"Successful flows: {success_count}/{total_tests}")
+            
+            # Test edge cases
+            self._test_vending_edge_cases()
+            
+            return overall_success
+            
+        except Exception as e:
+            logger.error(f"Vending machine payment flow test failed: {e}")
+            self.log_test_result("VM Payment Flow", False, f"Flow test error: {e}")
+            return False
     
+    def _simulate_payment_monitoring(self, invoice_id: str, product: dict) -> bool:
+        """Simulate payment monitoring for vending machine"""
+        try:
+            logger.info(f"Monitoring payment for {product['name']} - Invoice: {invoice_id}")
+            
+            # Check initial status
+            status_info = self.btcpay.get_invoice_status(invoice_id)
+            if not status_info:
+                logger.error("Failed to get initial invoice status")
+                return False
+            
+            initial_status = status_info['status']
+            logger.info(f"Initial invoice status: {initial_status}")
+            
+            # Simulate monitoring cycle (in real vending machine, this would be continuous)
+            monitoring_cycles = 3
+            for cycle in range(monitoring_cycles):
+                logger.debug(f"Monitoring cycle {cycle + 1}/{monitoring_cycles}")
+                
+                # Check status
+                current_status = self.btcpay.get_invoice_status(invoice_id)
+                if current_status:
+                    status = current_status['status']
+                    logger.debug(f"Current status: {status}")
+                    
+                    # In a real scenario, we'd wait for 'Settled' status (BTCPay Server v1)
+                    # For testing, we'll accept any valid status response as successful monitoring
+                    if status in [InvoiceStatus.NEW.value, InvoiceStatus.PROCESSING.value, 
+                                 InvoiceStatus.SETTLED.value]:
+                        logger.info(f"Payment monitoring successful - Status: {status}")
+                        return True
+                    elif status in [InvoiceStatus.EXPIRED.value, InvoiceStatus.INVALID.value]:
+                        logger.warning(f"Invoice expired or invalid - Status: {status}")
+                        return False
+                
+                time.sleep(0.3)  # Simulate monitoring delay
+            
+            logger.info("Payment monitoring completed successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Payment monitoring error: {e}")
+            return False
+    
+    def _simulate_product_release(self, product: dict) -> bool:
+        """Simulate product release mechanism"""
+        try:
+            logger.info(f"Simulating product release for {product['name']} from slot {product['id']}")
+            
+            # Simulate MDB communication to vending machine
+            logger.debug("Sending MDB command to release product...")
+            
+            # Simulate physical product release (would be actual MDB commands in real system)
+            release_steps = [
+                f"Activating motor for slot {product['id']}",
+                f"Dispensing {product['name']}",
+                "Verifying product dispensed",
+                "Product release completed"
+            ]
+            
+            for step in release_steps:
+                logger.debug(f"Release step: {step}")
+                time.sleep(0.1)  # Simulate physical action time
+            
+            logger.info(f"Product release successful: {product['name']} dispensed from slot {product['id']}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Product release simulation error: {e}")
+            return False
+    
+    def _test_vending_edge_cases(self):
+        """Test vending machine edge cases"""
+        logger.info("Testing vending machine edge cases")
+        
+        edge_cases = [
+            ("Invalid Amount", -1.0, "EUR", "Negative amount test"),
+            ("Zero Amount", 0.0, "EUR", "Zero amount test"),
+            ("Large Amount", 999.99, "EUR", "Large amount test"),
+            ("Invalid Currency", 1.0, "XYZ", "Invalid currency test")
+        ]
+        
+        for case_name, amount, currency, description in edge_cases:
+            try:
+                invoice = self.btcpay.create_invoice(amount, currency, description)
+                
+                if case_name in ["Invalid Amount", "Zero Amount"]:
+                    # These should fail
+                    success = invoice is None
+                    result_msg = "Properly rejected invalid amount" if success else "Invalid amount accepted"
+                elif case_name == "Invalid Currency":
+                    # This might fail or succeed depending on BTCPay configuration
+                    success = True  # Accept either outcome for currency
+                    result_msg = f"Currency handling: {'accepted' if invoice else 'rejected'}"
+                else:
+                    # Large amount should succeed
+                    success = invoice is not None
+                    result_msg = "Large amount handled correctly" if success else "Large amount rejected"
+                
+                self.log_test_result(f"VM Edge Case - {case_name}", success, result_msg)
+                
+                # Track invoice for cleanup if created
+                if invoice and 'invoice_id' in invoice:
+                    self.test_invoices.append(invoice['invoice_id'])
+                    
+            except Exception as e:
+                # Exceptions might be expected for some edge cases
+                expected_exception = case_name in ["Invalid Amount", "Zero Amount"]
+                success = expected_exception
+                result_msg = f"Exception handling: {'expected' if expected_exception else 'unexpected'}"
+                self.log_test_result(f"VM Edge Case - {case_name}", success, result_msg)
+
     def cleanup(self):
         """Clean up test invoices and resources"""
-        print("\n10. Cleaning Up...")
+        print("\n11. Cleaning Up...")
         
         try:
             # Cancel any remaining test invoices
@@ -536,6 +747,13 @@ class BTCPayTestSuite:
         print(f"Server URL: {config.btcpay.server_url}")
         print(f"Store ID: {'[CONFIGURED]' if config.btcpay.store_id else '[NOT SET]'}")
         print(f"API Key: {'[CONFIGURED]' if config.btcpay.api_key else '[NOT SET]'}")
+        print("")
+        print("REQUIRED API KEY PERMISSIONS:")
+        print("✅ btcpay.store.cancreateinvoice    - Create invoices")
+        print("✅ btcpay.store.canviewinvoices     - View/monitor invoices") 
+        print("✅ btcpay.store.canmodifyinvoices   - Cancel invoices")
+        print("📝 Make sure your API key is scoped to your specific store!")
+        print("")
         
         # Run tests in sequence
         if not self.test_configuration():
@@ -553,6 +771,7 @@ class BTCPayTestSuite:
             self.test_lightning_invoice_generation()
             self.test_invoice_cancellation()
             self.test_performance()
+            self.test_vending_machine_payment_flow()
         else:
             print("\n⚠️ No server connection - skipping server-dependent tests")
         

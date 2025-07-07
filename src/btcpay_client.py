@@ -14,12 +14,10 @@ from config import config
 logger = logging.getLogger(__name__)
 
 class InvoiceStatus(Enum):
-    """Invoice status constants"""
+    """Invoice status constants - Updated to match BTCPay Server v1 API"""
     NEW = "New"
     PROCESSING = "Processing"
-    PAID = "Paid"
-    CONFIRMED = "Confirmed"
-    COMPLETE = "Complete"
+    SETTLED = "Settled"  # Changed from PAID/CONFIRMED/COMPLETE
     EXPIRED = "Expired"
     INVALID = "Invalid"
 
@@ -38,16 +36,40 @@ class BTCPayClient:
         self._payment_callbacks = {}
         
     def initialize(self) -> bool:
-        """Initialize BTCPay Server connection"""
+        """Initialize BTCPay Server connection using a simple test"""
         try:
-            # Test connection by getting store info
-            response = self._make_request('GET', f'/api/v1/stores/{self.store_id}')
-            if response:
+            # Instead of accessing store settings (which requires btcpay.store.canviewstoresettings),
+            # we'll test by attempting to create a minimal test invoice and then cancel it
+            logger.info("Testing BTCPay Server connection...")
+            
+            # Try to create a small test invoice
+            test_invoice_data = {
+                "amount": "0.01",
+                "currency": "EUR",
+                "metadata": {
+                    "orderId": f"connection_test_{int(time.time())}",
+                    "itemDesc": "Connection Test"
+                }
+            }
+            
+            response = self._make_request('POST', f'/api/v1/stores/{self.store_id}/invoices', test_invoice_data)
+            
+            if response and 'id' in response:
+                test_invoice_id = response['id']
+                logger.info(f"Connection test successful - created test invoice: {test_invoice_id}")
+                
+                # Try to cancel the test invoice to clean up
+                try:
+                    self._make_request('DELETE', f'/api/v1/stores/{self.store_id}/invoices/{test_invoice_id}')
+                    logger.debug("Test invoice cancelled successfully")
+                except:
+                    logger.debug("Test invoice cleanup failed (not critical)")
+                
                 self.is_connected = True
                 logger.info("BTCPay Server connection established")
                 return True
             else:
-                logger.error("Failed to connect to BTCPay Server")
+                logger.error("Failed to connect to BTCPay Server - cannot create invoices")
                 return False
                 
         except Exception as e:
@@ -194,8 +216,8 @@ class BTCPayClient:
                             
                             last_status = current_status
                             
-                            # Stop monitoring if payment is complete or expired
-                            if current_status in [InvoiceStatus.COMPLETE.value, 
+                            # Stop monitoring if payment is settled, expired, or invalid
+                            if current_status in [InvoiceStatus.SETTLED.value,
                                                 InvoiceStatus.EXPIRED.value, 
                                                 InvoiceStatus.INVALID.value]:
                                 break
@@ -224,9 +246,8 @@ class BTCPayClient:
             status_info = self.get_invoice_status(invoice_id)
             if status_info:
                 status = status_info['status']
-                return status in [InvoiceStatus.PAID.value, 
-                                InvoiceStatus.CONFIRMED.value, 
-                                InvoiceStatus.COMPLETE.value]
+                # Only SETTLED status means the invoice is actually paid
+                return status == InvoiceStatus.SETTLED.value
             return False
             
         except Exception as e:
@@ -266,9 +287,30 @@ class BTCPayClient:
     def check_connection(self) -> bool:
         """Check BTCPay Server connection"""
         try:
-            response = self._make_request('GET', f'/api/v1/stores/{self.store_id}')
-            self.is_connected = response is not None
-            return self.is_connected
+            # Use the same method as initialize() - create a small test invoice
+            test_invoice_data = {
+                "amount": "0.01",
+                "currency": "EUR",
+                "metadata": {
+                    "orderId": f"connection_check_{int(time.time())}",
+                    "itemDesc": "Connection Check"
+                }
+            }
+            
+            response = self._make_request('POST', f'/api/v1/stores/{self.store_id}/invoices', test_invoice_data)
+            
+            if response and 'id' in response:
+                # Try to cancel the test invoice to clean up
+                try:
+                    self._make_request('DELETE', f'/api/v1/stores/{self.store_id}/invoices/{response["id"]}')
+                except:
+                    pass  # Ignore cleanup failures
+                
+                self.is_connected = True
+                return True
+            else:
+                self.is_connected = False
+                return False
             
         except Exception as e:
             logger.error(f"BTCPay connection check failed: {e}")

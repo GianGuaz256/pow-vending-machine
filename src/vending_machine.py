@@ -308,7 +308,7 @@ class VendingMachine:
                 amount = self.current_invoice['amount']
                 currency = self.current_invoice['currency']
                 
-                if status in [InvoiceStatus.PAID.value, InvoiceStatus.CONFIRMED.value]:
+                if status == InvoiceStatus.SETTLED.value:
                     self.display.show_payment_status(amount, currency, "paid")
                 elif status == InvoiceStatus.EXPIRED.value:
                     self.display.show_payment_status(amount, currency, "expired")

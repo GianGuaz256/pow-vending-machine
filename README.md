@@ -539,8 +539,13 @@ The system uses BTCPay Server's REST API:
 
 ### Required Permissions
 API key needs these permissions:
-- `btcpay.store.canmodifyinvoices`
-- `btcpay.store.canviewinvoices`
+- `btcpay.store.cancreateinvoice` - Required to create new invoices for vending machine purchases
+- `btcpay.store.canviewinvoices` - Required to monitor invoice status and payment confirmation
+- `btcpay.store.canmodifyinvoices` - Required to cancel invoices when necessary
+
+**Note:** For testing and troubleshooting, you may also want:
+- `btcpay.store.webhooks.canmodifywebhooks` - For webhook management (optional)
+- `btcpay.store.canviewstoresettings` - For advanced store configuration (optional)
 
 ## Development
 
