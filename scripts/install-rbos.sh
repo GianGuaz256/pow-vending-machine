@@ -67,15 +67,17 @@ sudo apt install -y \
     libportmidi-dev \
     python3-pygame
 
-# Enable SPI and UART interfaces
-echo "Enabling SPI and UART interfaces..."
-# Check if raspi-config is available
-if command -v raspi-config &> /dev/null; then
-    sudo raspi-config nonint do_spi 0
-    sudo raspi-config nonint do_serial 0
-else
-    echo "raspi-config not found, please enable SPI and UART manually"
-fi
+## TODO: ADD LATER (IF NEEDED)
+
+# # Enable SPI and UART interfaces
+# echo "Enabling SPI and UART interfaces..."
+# # Check if raspi-config is available
+# if command -v raspi-config &> /dev/null; then
+#     sudo raspi-config nonint do_spi 0
+#     sudo raspi-config nonint do_serial 0
+# else
+#     echo "raspi-config not found, please enable SPI and UART manually"
+# fi
 
 # Create virtual environment
 echo "Creating Python virtual environment..."
@@ -129,12 +131,14 @@ EOF
 # Reload systemd
 sudo systemctl daemon-reload
 
+## TODO: ADD LATER (IF NEEDED)
+
 # Set up udev rules for MDB device
-echo "Setting up udev rules for MDB device..."
-sudo tee /etc/udev/rules.d/99-mdb-device.rules > /dev/null <<EOF
-# Qibixx MDB Pi HAT
-SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="mdb0", GROUP="dialout", MODE="0664"
-EOF
+# echo "Setting up udev rules for MDB device..."
+# sudo tee /etc/udev/rules.d/99-mdb-device.rules > /dev/null <<EOF
+# # Qibixx MDB Pi HAT
+# SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="mdb0", GROUP="dialout", MODE="0664"
+# EOF
 
 sudo udevadm control --reload-rules
 
@@ -142,25 +146,27 @@ sudo udevadm control --reload-rules
 echo "Adding user to dialout group..."
 sudo usermod -a -G dialout $USER
 
+## TODO: ADD LATER (IF NEEDED)
+
 # Configure display settings
-echo "Configuring display settings..."
-# Check for both possible config locations
-CONFIG_FILE="/boot/config.txt"
-if [ ! -f "$CONFIG_FILE" ] && [ -f "/boot/firmware/config.txt" ]; then
-    CONFIG_FILE="/boot/firmware/config.txt"
-fi
+# echo "Configuring display settings..."
+# # Check for both possible config locations
+# CONFIG_FILE="/boot/config.txt"
+# if [ ! -f "$CONFIG_FILE" ] && [ -f "/boot/firmware/config.txt" ]; then
+#     CONFIG_FILE="/boot/firmware/config.txt"
+# fi
 
-if [ -f "$CONFIG_FILE" ]; then
-    if ! grep -q "dtparam=spi=on" "$CONFIG_FILE"; then
-        echo "dtparam=spi=on" | sudo tee -a "$CONFIG_FILE"
-    fi
+# if [ -f "$CONFIG_FILE" ]; then
+#     if ! grep -q "dtparam=spi=on" "$CONFIG_FILE"; then
+#         echo "dtparam=spi=on" | sudo tee -a "$CONFIG_FILE"
+#     fi
 
-    if ! grep -q "enable_uart=1" "$CONFIG_FILE"; then
-        echo "enable_uart=1" | sudo tee -a "$CONFIG_FILE"
-    fi
-else
-    echo "Warning: Could not find boot config file. Please enable SPI and UART manually."
-fi
+#     if ! grep -q "enable_uart=1" "$CONFIG_FILE"; then
+#         echo "enable_uart=1" | sudo tee -a "$CONFIG_FILE"
+#     fi
+# else
+#     echo "Warning: Could not find boot config file. Please enable SPI and UART manually."
+# fi
 
 # Test installation
 echo "Testing installation..."
