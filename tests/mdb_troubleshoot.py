@@ -174,12 +174,12 @@ def test_mdb_communication_detailed(port):
     logger.info(f"DETAILED MDB TEST ON {port}")
     logger.info("="*60)
     
-    # Test multiple MDB protocols and baud rates
+    # Test multiple MDB protocols and baud rates (38400 first since detected working)
     mdb_configs = [
-        {'baud': 9600, 'name': 'Standard MDB'},
+        {'baud': 38400, 'name': 'Qibixx MDB Pi HAT (detected)'},
+        {'baud': 115200, 'name': 'USB MDB Bridge'},
         {'baud': 19200, 'name': 'Fast MDB'},
-        {'baud': 38400, 'name': 'High Speed MDB'},
-        {'baud': 115200, 'name': 'USB MDB Bridge'}
+        {'baud': 9600, 'name': 'Standard MDB'}
     ]
     
     for config in mdb_configs:

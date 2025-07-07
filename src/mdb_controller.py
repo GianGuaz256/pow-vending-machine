@@ -49,10 +49,10 @@ class MDBController:
         """Initialize MDB connection"""
         try:
             # Qibixx MDB Pi HAT serial parameters:
-            # Baudrate: 115200, Parity: None, Data Bits: 8, Stop Bits: 1
+            # Baudrate: 38400, Parity: None, Data Bits: 8, Stop Bits: 1
             self.serial_port = serial.Serial(
                 port=config.mdb.serial_port,
-                baudrate=config.mdb.baud_rate,  # 115200 for Qibixx MDB Pi HAT
+                baudrate=config.mdb.baud_rate,  # 38400 for Qibixx MDB Pi HAT
                 timeout=config.mdb.timeout,
                 bytesize=serial.EIGHTBITS,     # 8 data bits
                 parity=serial.PARITY_NONE,     # No parity

@@ -25,7 +25,7 @@ class DisplayConfig:
 class MDBConfig:
     """MDB board configuration"""
     serial_port: str = os.getenv("MDB_SERIAL_PORT", "/dev/ttyAMA0")
-    baud_rate: int = int(os.getenv("MDB_BAUD_RATE", "115200"))  # Qibixx MDB Pi HAT uses 115200 baud
+    baud_rate: int = int(os.getenv("MDB_BAUD_RATE", "38400"))  # Qibixx MDB Pi HAT detected at 38400 baud
     timeout: float = 1.0
     retry_attempts: int = 3
     
