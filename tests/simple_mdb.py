@@ -80,6 +80,9 @@ def test_mdb_communication(port):
             ser.flushOutput()
             time.sleep(0.1)
             
+            # Track if we get any responses
+            response_received = False
+            
             # Test 1: Send RESET command
             logger.info("Test 1: Sending RESET command (0x00)")
             reset_cmd = b'\x00'
@@ -92,6 +95,7 @@ def test_mdb_communication(port):
             if ser.in_waiting > 0:
                 response = ser.read(ser.in_waiting)
                 logger.info(f"Received response: {response.hex()} ({len(response)} bytes)")
+                response_received = True
                 
                 # Check for ACK (0x00) or other expected responses
                 if response == b'\x00':
@@ -112,6 +116,7 @@ def test_mdb_communication(port):
             if ser.in_waiting > 0:
                 response = ser.read(ser.in_waiting)
                 logger.info(f"Setup response: {response.hex()} ({len(response)} bytes)")
+                response_received = True
             else:
                 logger.warning("No response to SETUP command")
             
@@ -126,6 +131,7 @@ def test_mdb_communication(port):
             if ser.in_waiting > 0:
                 response = ser.read(ser.in_waiting)
                 logger.info(f"Status response: {response.hex()} ({len(response)} bytes)")
+                response_received = True
             else:
                 logger.warning("No response to STATUS command")
             
@@ -136,12 +142,20 @@ def test_mdb_communication(port):
             if ser.in_waiting > 0:
                 response = ser.read(ser.in_waiting)
                 logger.info(f"Spontaneous data: {response.hex()} ({len(response)} bytes)")
+                response_received = True
             else:
                 logger.info("No spontaneous data received")
             
             ser.close()
-            logger.info(f"Successfully tested {port} at {baud_rate} baud")
-            return True
+            
+            # Only return True if we actually received responses from MDB device
+            if response_received:
+                logger.info(f"✓ Successfully communicated with MDB device on {port} at {baud_rate} baud")
+                return True
+            else:
+                logger.warning(f"✗ Serial port {port} opened but no MDB device responded at {baud_rate} baud")
+                # Continue to next baud rate
+                continue
             
         except serial.SerialException as e:
             logger.error(f"Serial error at {baud_rate} baud: {e}")
@@ -156,7 +170,7 @@ def test_mdb_communication(port):
             except:
                 pass
     
-    logger.error(f"Failed to communicate with MDB device on {port}")
+    logger.error(f"❌ Failed to communicate with MDB device on {port} - no responses received at any baud rate")
     return False
 
 def check_permissions():
