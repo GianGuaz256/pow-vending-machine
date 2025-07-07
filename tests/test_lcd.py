@@ -72,11 +72,14 @@ def show_qr_with_message(screen, width, height, qr_data, title):
         qr_size = min(width - 100, height - 150)
         qr_img = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
         
-        # Convert to pygame surface
-        qr_mode = qr_img.mode
+        # Convert PIL image to pygame surface properly
+        # Convert to RGB if not already
+        if qr_img.mode != 'RGB':
+            qr_img = qr_img.convert('RGB')
+        
         qr_size_tuple = qr_img.size
         qr_data_bytes = qr_img.tobytes()
-        qr_surface = pygame.image.fromstring(qr_data_bytes, qr_size_tuple, qr_mode)
+        qr_surface = pygame.image.fromstring(qr_data_bytes, qr_size_tuple, 'RGB')
         
         # Show title
         try:
@@ -152,21 +155,9 @@ def main():
             return
         
         # Test 4: Final message
-        show_text_message(screen, width, height, "Test Complete", "Press ESC or close window to exit")
-        
-        # Wait until user closes or presses escape
-        running = True
-        clock = pygame.time.Clock()
-        
-        while running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        running = False
-            
-            clock.tick(60)
+        show_text_message(screen, width, height, "Test Complete", "Closing automatically in 3 seconds...")
+        if not wait_for_events(3):
+            return
         
         print("✓ All tests completed successfully!")
         
