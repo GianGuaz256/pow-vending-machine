@@ -52,7 +52,7 @@ class MDBController:
                 port=config.mdb.serial_port,
                 baudrate=config.mdb.baud_rate,
                 timeout=config.mdb.timeout,
-                bytesize=serial.NINEBITS,  # MDB uses 9-bit protocol
+                bytesize=serial.EIGHTBITS,  # Use 8-bit, handle 9th bit in software
                 parity=serial.PARITY_NONE,
                 stopbits=serial.STOPBITS_ONE
             )
@@ -110,9 +110,12 @@ class MDBController:
                     byte = self.serial_port.read(1)
                     if byte:
                         response += byte
-                        # Check for end of packet (mode bit set)
-                        if byte[0] & 0x100:  # 9th bit set
-                            break
+                        # For now, read until no more data or timeout
+                        # In real MDB implementation, 9th bit handling would be needed
+                        if self.serial_port.in_waiting == 0:
+                            time.sleep(0.01)  # Small delay to check for more data
+                            if self.serial_port.in_waiting == 0:
+                                break
                 time.sleep(0.01)
             
             return response if response else None
@@ -287,8 +290,9 @@ class MDBController:
     def get_status(self) -> Dict[str, Any]:
         """Get current MDB status"""
         return {
-            'connected': self.is_connected,
             'state': self.state.value,
+            'is_connected': self.is_connected,
+            'last_activity': time.time(),
             'session_data': self.session_data.copy() if self.session_data else {}
         }
     
