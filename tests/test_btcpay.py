@@ -100,6 +100,8 @@ class BTCPayTestSuite:
                     logger.debug(f"API Key length: {len(value)} characters")
                 elif test_name == "Store ID" and value:
                     logger.debug(f"Store ID length: {len(value)} characters")
+
+                    #Ciao
                 
                 passed = validator(value)
                 
