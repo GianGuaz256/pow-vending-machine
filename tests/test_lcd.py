@@ -6,6 +6,7 @@ import sys
 import os
 import time
 import logging
+import pygame
 
 # Add project root and src to path for imports
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -18,6 +19,15 @@ from lcd_display import LCDDisplay
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def responsive_sleep(duration):
+    """Sleep while processing pygame events to keep window responsive"""
+    end_time = time.time() + duration
+    while time.time() < end_time:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return
+        time.sleep(0.01)  # Small sleep to prevent excessive CPU usage
 
 class LCDTestSuite:
     """Comprehensive LCD Display Test Suite"""
@@ -70,18 +80,18 @@ class LCDTestSuite:
         try:
             # Test clear screen
             self.display.clear_screen()
-            time.sleep(0.5)
+            responsive_sleep(0.5)
             self.log_test_result("Clear Screen", True, "Screen cleared successfully")
             
             # Test basic message
             self.display.show_message("LCD Test", "Basic text display working")
-            time.sleep(1)
+            responsive_sleep(1)
             self.log_test_result("Basic Message", True, "Message displayed successfully")
             
             # Test long message
             long_message = "This is a longer message to test text wrapping and multi-line display functionality"
             self.display.show_message("Long Text Test", long_message)
-            time.sleep(2)
+            responsive_sleep(2)
             self.log_test_result("Long Message", True, "Long message with wrapping displayed")
             
             return True
@@ -109,7 +119,7 @@ class LCDTestSuite:
         for test_name, test_data, description in qr_test_cases:
             try:
                 self.display.show_qr_code(test_data, f"QR: {test_name}")
-                time.sleep(1.5)
+                responsive_sleep(1.5)
                 self.log_test_result(f"QR Code - {test_name}", True, description)
                 success_count += 1
             except Exception as e:
@@ -141,7 +151,7 @@ class LCDTestSuite:
         for amount, currency, status, description in payment_test_cases:
             try:
                 self.display.show_payment_status(amount, currency, status)
-                time.sleep(1)
+                responsive_sleep(1)
                 self.log_test_result(f"Payment Status - {status}", True, 
                                    f"{amount} {currency} - {description}")
                 success_count += 1
@@ -172,7 +182,7 @@ class LCDTestSuite:
         for error_msg in error_test_cases:
             try:
                 self.display.show_error(error_msg)
-                time.sleep(1)
+                responsive_sleep(1)
                 self.log_test_result(f"Error - {error_msg}", True, "Error message displayed")
                 success_count += 1
             except Exception as e:
@@ -200,7 +210,7 @@ class LCDTestSuite:
         for mdb_status, btcpay_status, display_status, description in status_test_cases:
             try:
                 self.display.show_system_status(mdb_status, btcpay_status, display_status)
-                time.sleep(1)
+                responsive_sleep(1)
                 self.log_test_result(f"System Status", True, description)
                 success_count += 1
             except Exception as e:
@@ -222,7 +232,7 @@ class LCDTestSuite:
             
             for item in items:
                 self.display.show_dispensing(item)
-                time.sleep(1.5)
+                responsive_sleep(1.5)
             
             self.log_test_result("Dispensing Animation", True, f"Tested {len(items)} dispensing animations")
             return True
@@ -244,7 +254,7 @@ class LCDTestSuite:
             
             for i in range(10):
                 self.display.show_message(f"Performance Test {i+1}", f"Update #{i+1}/10")
-                time.sleep(0.1)
+                responsive_sleep(0.1)
             
             end_time = time.time()
             total_time = end_time - start_time
@@ -267,7 +277,7 @@ class LCDTestSuite:
             if self.display:
                 self.display.clear_screen()
                 self.display.show_message("Test Complete", "LCD tests finished successfully")
-                time.sleep(2)
+                responsive_sleep(2)
                 self.display.close()
                 self.log_test_result("Cleanup", True, "Display resources cleaned up")
         except Exception as e:
