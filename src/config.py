@@ -90,10 +90,11 @@ class Config:
             print(f"  Looking for: {env_file}")
         
         print(f"\nBTCPay Configuration:")
-        print(f"  Server URL: {'[SET]' if self.btcpay.server_url != 'https://your-btcpay-server.com' else '[NOT SET]'}")
-        print(f"  Store ID: {'[SET]' if self.btcpay.store_id else '[NOT SET]'}")
-        print(f"  API Key: {'[SET]' if self.btcpay.api_key else '[NOT SET]'}")
-        print(f"  Webhook Secret: {'[SET]' if self.btcpay.webhook_secret else '[NOT SET]'}")
+        print(f"  Server URL: {self.btcpay.server_url}")
+        print(f"  Server URL Status: {'[SET]' if self.btcpay.server_url != 'https://your-btcpay-server.com' else '[NOT SET]'}")
+        print(f"  Store ID: {'[SET - ' + str(len(self.btcpay.store_id)) + ' chars]' if self.btcpay.store_id else '[NOT SET]'}")
+        print(f"  API Key: {'[SET - ' + str(len(self.btcpay.api_key)) + ' chars]' if self.btcpay.api_key else '[NOT SET]'}")
+        print(f"  Webhook Secret: {'[SET - ' + str(len(self.btcpay.webhook_secret)) + ' chars]' if self.btcpay.webhook_secret else '[NOT SET]'}")
         
         print(f"\nMDB Configuration:")
         print(f"  Serial Port: {self.mdb.serial_port}")
@@ -106,6 +107,13 @@ class Config:
         print(f"\nDisplay Configuration:")
         print(f"  Size: {self.display.width}x{self.display.height}")
         print(f"  Rotation: {self.display.orientation}°")
+        
+        # Debug validation
+        print(f"\nValidation Debug:")
+        print(f"  server_url valid: {bool(self.btcpay.server_url)}")
+        print(f"  store_id valid: {bool(self.btcpay.store_id)}")
+        print(f"  api_key valid: {bool(self.btcpay.api_key)}")
+        print(f"  validation result: {self.validate()}")
         
         print("="*50)
 

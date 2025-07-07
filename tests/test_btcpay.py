@@ -65,7 +65,8 @@ class BTCPayTestSuite:
         
         try:
             # Log configuration file location
-            logger.debug(f"Configuration module location: {config.__file__}")
+            import config as config_module
+            logger.debug(f"Configuration module location: {config_module.__file__}")
             
             # Print configuration status for debugging
             logger.info("Printing configuration status for debugging")
@@ -120,6 +121,13 @@ class BTCPayTestSuite:
                         logger.error(f"Required field {test_name} failed validation")
             
             self.config_complete = not required_failed
+            
+            # Debug configuration status
+            logger.debug(f"required_failed: {required_failed}")
+            logger.debug(f"config_complete: {self.config_complete}")
+            logger.debug(f"server_url: '{config.btcpay.server_url}'")
+            logger.debug(f"store_id: '{config.btcpay.store_id}'")
+            logger.debug(f"api_key length: {len(config.btcpay.api_key) if config.btcpay.api_key else 0}")
             
             if self.config_complete:
                 logger.info("All required BTCPay configuration is complete")
