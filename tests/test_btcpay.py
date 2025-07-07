@@ -67,6 +67,10 @@ class BTCPayTestSuite:
             # Log configuration file location
             logger.debug(f"Configuration module location: {config.__file__}")
             
+            # Print configuration status for debugging
+            logger.info("Printing configuration status for debugging")
+            config.print_config_status()
+            
             # Check configuration completeness
             config_tests = [
                 ("Server URL", config.btcpay.server_url, lambda x: x and x.startswith(('http://', 'https://'))),
