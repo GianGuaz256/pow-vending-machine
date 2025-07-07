@@ -16,9 +16,24 @@ sys.path.insert(0, os.path.join(project_root, 'src'))
 from config import config
 from mdb_controller import MDBController, VendState
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Set up enhanced logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('mdb_test.log')
+    ]
+)
 logger = logging.getLogger(__name__)
+
+# Log system information
+logger.info("="*60)
+logger.info("MDB TEST SESSION STARTED")
+logger.info("="*60)
+logger.info(f"Python version: {sys.version}")
+logger.info(f"Working directory: {os.getcwd()}")
+logger.info(f"Project root: {project_root}")
 
 class MDBTestSuite:
     """Comprehensive MDB Controller Test Suite"""
@@ -47,22 +62,58 @@ class MDBTestSuite:
     def detect_hardware(self):
         """Detect if MDB hardware is available"""
         print("\n1. Detecting MDB Hardware...")
+        logger.info("Starting hardware detection")
         
         # Check for common serial ports
         possible_ports = ['/dev/ttyAMA0', '/dev/ttyUSB0', '/dev/ttyS0', '/dev/mdb0']
         available_ports = []
         
+        logger.debug(f"Checking for serial ports: {possible_ports}")
+        
         for port in possible_ports:
+            logger.debug(f"Checking port: {port}")
             if os.path.exists(port):
-                available_ports.append(port)
+                try:
+                    # Try to get port info
+                    stat_info = os.stat(port)
+                    logger.debug(f"Port {port} exists - mode: {oct(stat_info.st_mode)}, size: {stat_info.st_size}")
+                    available_ports.append(port)
+                except Exception as e:
+                    logger.warning(f"Port {port} exists but cannot access: {e}")
+            else:
+                logger.debug(f"Port {port} does not exist")
+        
+        # Additional checks for Raspberry Pi specific ports
+        if os.path.exists('/proc/device-tree/model'):
+            try:
+                with open('/proc/device-tree/model', 'r') as f:
+                    model = f.read().strip()
+                logger.info(f"Detected Raspberry Pi model: {model}")
+            except Exception as e:
+                logger.debug(f"Could not read Pi model: {e}")
+        
+        # Check GPIO access (relevant for Pi)
+        gpio_paths = ['/dev/gpiomem', '/sys/class/gpio']
+        for gpio_path in gpio_paths:
+            if os.path.exists(gpio_path):
+                logger.debug(f"GPIO access available: {gpio_path}")
         
         self.hardware_available = len(available_ports) > 0
         
         if self.hardware_available:
             print(f"  ✓ Hardware detected: {available_ports}")
+            logger.info(f"MDB hardware detected - available ports: {available_ports}")
             self.log_test_result("Hardware Detection", True, f"Found ports: {available_ports}")
         else:
             print("  ⚠ No MDB hardware detected - running in simulation mode")
+            logger.warning("No MDB hardware detected - switching to simulation mode")
+            logger.info("Available devices in /dev/:")
+            try:
+                dev_files = [f for f in os.listdir('/dev/') if f.startswith(('tty', 'usb', 'serial'))][:10]
+                logger.info(f"Sample /dev/ files: {dev_files}")
+            except Exception as e:
+                logger.debug(f"Could not list /dev/ files: {e}")
+            
             self.simulation_mode = True
             self.log_test_result("Hardware Detection", True, "Simulation mode activated")
         
@@ -71,31 +122,55 @@ class MDBTestSuite:
     def test_initialization(self):
         """Test MDB controller initialization"""
         print("\n2. Testing MDB Initialization...")
+        logger.info("Starting MDB controller initialization test")
         
         try:
+            logger.debug("Creating MDBController instance")
             self.mdb = MDBController()
+            logger.debug("MDBController object created successfully")
+            
+            # Log configuration being used
+            logger.info(f"MDB Config - Port: {config.mdb.serial_port}")
+            logger.info(f"MDB Config - Baud: {config.mdb.baud_rate}")
+            logger.info(f"MDB Config - Timeout: {config.mdb.timeout}")
+            logger.info(f"MDB Config - Retries: {config.mdb.retry_attempts}")
             
             if self.hardware_available:
+                logger.info("Attempting hardware initialization")
                 # Test real hardware initialization
-                init_success = self.mdb.initialize()
-                if init_success:
-                    self.log_test_result("MDB Initialization", True, 
-                                       f"Hardware initialized on {config.mdb.serial_port}")
-                    return True
-                else:
-                    self.log_test_result("MDB Initialization", False, "Hardware initialization failed")
-                    # Fall back to simulation mode
+                try:
+                    init_success = self.mdb.initialize()
+                    logger.info(f"Hardware initialization result: {init_success}")
+                    
+                    if init_success:
+                        logger.info("MDB hardware successfully initialized")
+                        self.log_test_result("MDB Initialization", True, 
+                                           f"Hardware initialized on {config.mdb.serial_port}")
+                        return True
+                    else:
+                        logger.error("Hardware initialization failed - switching to simulation")
+                        self.log_test_result("MDB Initialization", False, "Hardware initialization failed")
+                        # Fall back to simulation mode
+                        self.simulation_mode = True
+                        self.hardware_available = False
+                except Exception as init_error:
+                    logger.error(f"Hardware initialization exception: {init_error}")
+                    logger.info("Falling back to simulation mode")
                     self.simulation_mode = True
                     self.hardware_available = False
             
             if self.simulation_mode:
+                logger.info("Running in simulation mode")
                 # In simulation mode, just check object creation
                 self.log_test_result("MDB Initialization", True, "Simulation mode - object created")
                 return True
                 
         except Exception as e:
+            logger.error(f"MDB initialization failed with exception: {e}")
+            logger.exception("Full exception traceback:")
             self.log_test_result("MDB Initialization", False, f"Initialization error: {e}")
             # Try simulation mode as fallback
+            logger.info("Attempting to continue in simulation mode")
             self.simulation_mode = True
             self.hardware_available = False
             return True  # Don't fail completely, continue in simulation

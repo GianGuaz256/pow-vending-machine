@@ -15,9 +15,24 @@ sys.path.insert(0, os.path.join(project_root, 'src'))
 from config import config
 from btcpay_client import BTCPayClient, InvoiceStatus
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Set up enhanced logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('btcpay_test.log')
+    ]
+)
 logger = logging.getLogger(__name__)
+
+# Log system information
+logger.info("="*60)
+logger.info("BTCPAY SERVER TEST SESSION STARTED") 
+logger.info("="*60)
+logger.info(f"Python version: {sys.version}")
+logger.info(f"Working directory: {os.getcwd()}")
+logger.info(f"Project root: {project_root}")
 
 class BTCPayTestSuite:
     """Comprehensive BTCPay Server Test Suite"""
@@ -46,8 +61,12 @@ class BTCPayTestSuite:
     def test_configuration(self):
         """Test BTCPay Server configuration"""
         print("\n1. Testing BTCPay Configuration...")
+        logger.info("Starting BTCPay configuration validation")
         
         try:
+            # Log configuration file location
+            logger.debug(f"Configuration module location: {config.__file__}")
+            
             # Check configuration completeness
             config_tests = [
                 ("Server URL", config.btcpay.server_url, lambda x: x and x.startswith(('http://', 'https://'))),
@@ -57,35 +76,59 @@ class BTCPayTestSuite:
                 ("Payment Timeout", config.btcpay.payment_timeout, lambda x: 30 <= x <= 3600)
             ]
             
+            logger.info("Validating BTCPay configuration parameters")
+            
             all_passed = True
             required_failed = False
             
             for test_name, value, validator in config_tests:
+                logger.debug(f"Validating {test_name}")
+                
+                # Log additional info for URL
+                if test_name == "Server URL" and value:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(value)
+                    logger.info(f"Server URL scheme: {parsed.scheme}, netloc: {parsed.netloc}")
+                
+                # Log lengths for sensitive fields
+                if test_name == "API Key" and value:
+                    logger.debug(f"API Key length: {len(value)} characters")
+                elif test_name == "Store ID" and value:
+                    logger.debug(f"Store ID length: {len(value)} characters")
+                
                 passed = validator(value)
                 
                 # Mask sensitive values in output
                 if test_name in ["API Key", "Webhook Secret"]:
-                    display_value = "[SET]" if value else "[NOT SET]"
+                    display_value = f"[SET - {len(value) if value else 0} chars]" if value else "[NOT SET]"
+                    logger.info(f"{test_name}: {display_value}")
                 else:
                     display_value = value
+                    logger.info(f"{test_name}: {display_value}")
                 
                 self.log_test_result(f"Config - {test_name}", passed, f"Value: {display_value}")
                 
                 if not passed:
                     all_passed = False
+                    logger.warning(f"Configuration validation failed for {test_name}")
                     if test_name in ["Server URL", "Store ID", "API Key"]:
                         required_failed = True
+                        logger.error(f"Required field {test_name} failed validation")
             
             self.config_complete = not required_failed
             
             if self.config_complete:
+                logger.info("All required BTCPay configuration is complete")
                 self.log_test_result("Configuration Complete", True, "All required fields configured")
             else:
+                logger.error("BTCPay configuration is incomplete - missing required fields")
                 self.log_test_result("Configuration Complete", False, "Missing required configuration")
             
             return all_passed
             
         except Exception as e:
+            logger.error(f"Configuration test failed with exception: {e}")
+            logger.exception("Full exception traceback:")
             self.log_test_result("Configuration Test", False, f"Config error: {e}")
             return False
     
@@ -114,36 +157,68 @@ class BTCPayTestSuite:
     def test_server_connection(self):
         """Test BTCPay server connection"""
         print("\n3. Testing Server Connection...")
+        logger.info("Starting BTCPay server connection test")
         
         if not self.btcpay:
+            logger.error("BTCPay client not initialized")
             self.log_test_result("Server Connection", False, "BTCPay client not initialized")
             return False
         
         if not self.config_complete:
+            logger.error("Cannot test connection - configuration incomplete")
             self.log_test_result("Server Connection", False, "Configuration incomplete")
             return False
         
         try:
+            logger.info(f"Attempting connection to: {config.btcpay.server_url}")
+            logger.debug(f"Using store ID: {config.btcpay.store_id}")
+            logger.debug(f"API key length: {len(config.btcpay.api_key) if config.btcpay.api_key else 0}")
+            
             # Test server connection
+            logger.debug("Calling btcpay.initialize()")
             connection_success = self.btcpay.initialize()
+            logger.info(f"Connection initialization result: {connection_success}")
             
             if connection_success:
                 self.connection_established = True
+                logger.info("Successfully established connection to BTCPay server")
                 self.log_test_result("Server Connection", True, "Successfully connected to BTCPay server")
                 
                 # Test basic API functionality
-                status = self.btcpay.get_status()
-                if isinstance(status, dict):
-                    self.log_test_result("API Response", True, "Server responded to API call")
-                else:
-                    self.log_test_result("API Response", False, "Invalid API response format")
+                logger.debug("Testing basic API functionality with status call")
+                try:
+                    status = self.btcpay.get_status()
+                    logger.debug(f"Status response type: {type(status)}")
+                    logger.debug(f"Status response preview: {str(status)[:200]}...")
+                    
+                    if isinstance(status, dict):
+                        logger.info("API status call successful - server is responding")
+                        self.log_test_result("API Response", True, "Server responded to API call")
+                        
+                        # Log some status details if available
+                        if 'version' in status:
+                            logger.info(f"BTCPay Server version: {status['version']}")
+                        if 'synchronizationStatus' in status:
+                            logger.info(f"Sync status: {status['synchronizationStatus']}")
+                            
+                    else:
+                        logger.warning(f"API response format unexpected: {type(status)}")
+                        self.log_test_result("API Response", False, "Invalid API response format")
+                
+                except Exception as api_error:
+                    logger.error(f"API status call failed: {api_error}")
+                    logger.exception("API call exception traceback:")
+                    self.log_test_result("API Response", False, f"API call failed: {api_error}")
                 
                 return True
             else:
+                logger.error("BTCPay server connection failed")
                 self.log_test_result("Server Connection", False, "Failed to connect to BTCPay server")
                 return False
                 
         except Exception as e:
+            logger.error(f"Connection test failed with exception: {e}")
+            logger.exception("Full connection exception traceback:")
             self.log_test_result("Server Connection", False, f"Connection error: {e}")
             return False
     
