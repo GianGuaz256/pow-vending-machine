@@ -59,15 +59,15 @@ class MDBController:
                 stopbits=serial.STOPBITS_ONE   # 1 stop bit
             )
             
-            # Test connection
-            if self._send_command(MDBCommand.RESET.value):
+            # Test connection with Qibixx VERSION command
+            if self._test_qibixx_connection():
                 self.is_connected = True
                 self.state = VendState.ENABLED
                 self._start_polling()
-                logger.info("MDB controller initialized successfully")
+                logger.info("Qibixx MDB Pi Hat initialized successfully")
                 return True
             else:
-                logger.error("Failed to establish MDB communication")
+                logger.error("Failed to establish communication with Qibixx MDB Pi Hat")
                 return False
                 
         except Exception as e:
@@ -75,27 +75,65 @@ class MDBController:
             return False
     
     def _send_command(self, command: int, data: bytes = b'') -> bool:
-        """Send command to MDB device"""
+        """Send command to Qibixx MDB Pi Hat"""
         if not self.serial_port or not self.serial_port.is_open:
             return False
             
         try:
             with self._lock:
-                # Construct MDB packet
-                packet = bytes([command]) + data
-                checksum = sum(packet) & 0xFF
-                packet += bytes([checksum])
+                # For Qibixx MDB Pi Hat, use text-based commands
+                if command == MDBCommand.RESET.value:
+                    qibixx_cmd = b'R\r'
+                elif command == MDBCommand.SETUP.value:
+                    qibixx_cmd = b'S\r'
+                elif command == MDBCommand.POLL.value:
+                    qibixx_cmd = b'P\r'
+                else:
+                    # Fallback to raw MDB command for testing
+                    packet = bytes([command]) + data
+                    checksum = sum(packet) & 0xFF
+                    qibixx_cmd = packet + bytes([checksum])
                 
-                # Send packet
-                self.serial_port.write(packet)
+                # Send command
+                self.serial_port.write(qibixx_cmd)
                 self.serial_port.flush()
                 
-                # Wait for ACK
-                response = self.serial_port.read(1)
-                return len(response) > 0 and response[0] == 0x00  # ACK
+                # Wait for response
+                time.sleep(0.1)
+                response = self.serial_port.read(100)  # Read more data
+                
+                # Check for valid response (not 0xFF NAK)
+                return len(response) > 0 and response != b'\xff'
                 
         except Exception as e:
-            logger.error(f"Failed to send MDB command: {e}")
+            logger.error(f"Failed to send command to Qibixx hat: {e}")
+            return False
+    
+    def _test_qibixx_connection(self) -> bool:
+        """Test connection to Qibixx MDB Pi Hat"""
+        if not self.serial_port or not self.serial_port.is_open:
+            return False
+            
+        try:
+            with self._lock:
+                # Send VERSION command to test connection
+                self.serial_port.write(b'V\r')
+                self.serial_port.flush()
+                
+                # Wait for response
+                time.sleep(0.5)
+                response = self.serial_port.read(100)
+                
+                # Check if we got any response (Qibixx will respond with data)
+                if len(response) > 0:
+                    logger.info(f"Qibixx connection test successful. Version response: {response.hex()}")
+                    return True
+                else:
+                    logger.warning("No response from Qibixx hat to VERSION command")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"Failed to test Qibixx connection: {e}")
             return False
     
     def _read_response(self, timeout: float = 1.0) -> Optional[bytes]:
@@ -146,16 +184,32 @@ class MDBController:
                 time.sleep(1.0)
     
     def _poll_device(self):
-        """Poll MDB device for status updates"""
+        """Poll Qibixx MDB Pi Hat for status updates"""
         try:
-            # Send poll command
-            if self._send_command(MDBCommand.POLL.value):
+            # Send Qibixx status command
+            if self._send_qibixx_command(b'S\r'):
                 response = self._read_response()
                 if response:
                     self._process_poll_response(response)
                     
         except Exception as e:
-            logger.error(f"Error polling MDB device: {e}")
+            logger.error(f"Error polling Qibixx hat: {e}")
+    
+    def _send_qibixx_command(self, command: bytes) -> bool:
+        """Send raw command to Qibixx hat"""
+        if not self.serial_port or not self.serial_port.is_open:
+            return False
+            
+        try:
+            with self._lock:
+                self.serial_port.write(command)
+                self.serial_port.flush()
+                time.sleep(0.1)
+                return True
+                
+        except Exception as e:
+            logger.error(f"Failed to send Qibixx command: {e}")
+            return False
     
     def _process_poll_response(self, response: bytes):
         """Process poll response from MDB device"""
@@ -280,12 +334,12 @@ class MDBController:
             return False
     
     def check_connection(self) -> bool:
-        """Check if MDB connection is healthy"""
+        """Check if Qibixx MDB Pi Hat connection is healthy"""
         try:
-            # Send a simple poll command to test connection
-            return self._send_command(MDBCommand.POLL.value)
+            # Send a simple version command to test connection
+            return self._send_qibixx_command(b'V\r')
         except Exception as e:
-            logger.error(f"MDB connection check failed: {e}")
+            logger.error(f"Qibixx connection check failed: {e}")
             self.is_connected = False
             return False
     
