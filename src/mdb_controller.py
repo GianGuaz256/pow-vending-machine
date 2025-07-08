@@ -59,7 +59,7 @@ class MDBController:
                 stopbits=serial.STOPBITS_ONE   # 1 stop bit
             )
             
-            # Test connection with Qibixx VERSION command
+            # Test connection with Qibixx SETUP command
             if self._test_qibixx_connection():
                 self.is_connected = True
                 self.state = VendState.ENABLED
@@ -116,20 +116,25 @@ class MDBController:
             
         try:
             with self._lock:
-                # Send VERSION command to test connection
-                self.serial_port.write(b'V\r')
+                # Clear any existing data first
+                self.serial_port.reset_input_buffer()
+                self.serial_port.reset_output_buffer()
+                time.sleep(0.1)
+                
+                # Send SETUP command to test connection (we know this works from troubleshooting)
+                self.serial_port.write(b'\x01')  # SETUP command
                 self.serial_port.flush()
                 
                 # Wait for response
                 time.sleep(0.5)
                 response = self.serial_port.read(100)
                 
-                # Check if we got any response (Qibixx will respond with data)
+                # Check if we got any response (SETUP command returns 000000)
                 if len(response) > 0:
-                    logger.info(f"Qibixx connection test successful. Version response: {response.hex()}")
+                    logger.info(f"Qibixx connection test successful. SETUP response: {response.hex()}")
                     return True
                 else:
-                    logger.warning("No response from Qibixx hat to VERSION command")
+                    logger.warning("No response from Qibixx hat to SETUP command")
                     return False
                     
         except Exception as e:
@@ -186,8 +191,8 @@ class MDBController:
     def _poll_device(self):
         """Poll Qibixx MDB Pi Hat for status updates"""
         try:
-            # Send Qibixx status command
-            if self._send_qibixx_command(b'S\r'):
+            # Send POLL command using binary protocol (more reliable)
+            if self._send_command(MDBCommand.POLL.value):
                 response = self._read_response()
                 if response:
                     self._process_poll_response(response)
@@ -336,8 +341,25 @@ class MDBController:
     def check_connection(self) -> bool:
         """Check if Qibixx MDB Pi Hat connection is healthy"""
         try:
-            # Send a simple version command to test connection
-            return self._send_qibixx_command(b'V\r')
+            # Send a simple SETUP command to test connection (we know this works)
+            if not self.serial_port or not self.serial_port.is_open:
+                return False
+                
+            with self._lock:
+                # Clear buffers
+                self.serial_port.reset_input_buffer()
+                self.serial_port.reset_output_buffer()
+                time.sleep(0.1)
+                
+                # Send SETUP command
+                self.serial_port.write(b'\x01')
+                self.serial_port.flush()
+                time.sleep(0.5)
+                
+                # Check for response
+                response = self.serial_port.read(100)
+                return len(response) > 0
+                
         except Exception as e:
             logger.error(f"Qibixx connection check failed: {e}")
             self.is_connected = False
