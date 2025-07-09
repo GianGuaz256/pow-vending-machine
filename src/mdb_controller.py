@@ -48,6 +48,8 @@ class MDBController:
     def initialize(self) -> bool:
         """Initialize MDB connection"""
         try:
+            logger.info("Initializing Qibixx MDB Pi HAT connection...")
+            
             # Qibixx MDB Pi HAT serial parameters:
             # Baudrate: 38400, Parity: None, Data Bits: 8, Stop Bits: 1
             self.serial_port = serial.Serial(
@@ -59,12 +61,16 @@ class MDBController:
                 stopbits=serial.STOPBITS_ONE   # 1 stop bit
             )
             
-            # Test connection with Qibixx SETUP command
+            # Allow HAT time to stabilize after serial port opening
+            logger.info("Allowing HAT to stabilize...")
+            time.sleep(1.0)
+            
+            # Test connection with adaptive baud rate detection
             if self._test_qibixx_connection():
                 self.is_connected = True
                 self.state = VendState.ENABLED
                 self._start_polling()
-                logger.info("Qibixx MDB Pi Hat initialized successfully")
+                logger.info(f"✓ Qibixx MDB Pi Hat initialized successfully at {self.baud_rate} baud")
                 return True
             else:
                 logger.error("Failed to establish communication with Qibixx MDB Pi Hat")
@@ -110,36 +116,80 @@ class MDBController:
             return False
     
     def _test_qibixx_connection(self) -> bool:
-        """Test connection to Qibixx MDB Pi Hat"""
-        if not self.serial_port or not self.serial_port.is_open:
+        """Test connection to Qibixx MDB Pi Hat with adaptive baud rate detection"""
+        if not self.serial_port:
             return False
             
-        try:
-            with self._lock:
-                # Clear any existing data first
-                self.serial_port.reset_input_buffer()
-                self.serial_port.reset_output_buffer()
-                time.sleep(0.1)
-                
-                # Send SETUP command to test connection (we know this works from troubleshooting)
-                self.serial_port.write(b'\x01')  # SETUP command
-                self.serial_port.flush()
-                
-                # Wait for response
-                time.sleep(0.5)
-                response = self.serial_port.read(100)
-                
-                # Check if we got any response (SETUP command returns 000000)
-                if len(response) > 0:
-                    logger.info(f"Qibixx connection test successful. SETUP response: {response.hex()}")
-                    return True
-                else:
-                    logger.warning("No response from Qibixx hat to SETUP command")
-                    return False
+        # Baud rates to try (HAT responds at different rates in different states)
+        baud_rates = [38400, 19200, 9600]  # Order based on troubleshooting results
+        test_commands = [
+            (b'\x01', "SETUP"),      # SETUP command
+            (b'\x08', "POLL"),       # POLL command  
+            (b'\x00', "RESET"),      # RESET command
+            (b'\x0f', "EXPANSION"),  # EXPANSION ID command
+        ]
+        
+        # Close current connection to change baud rate
+        original_baud = self.baud_rate
+        
+        for baud_rate in baud_rates:
+            logger.info(f"Testing Qibixx connection at {baud_rate} baud...")
+            
+            try:
+                # Close and reopen with new baud rate
+                if self.serial_port.is_open:
+                    self.serial_port.close()
                     
+                self.serial_port.baudrate = baud_rate
+                self.serial_port.open()
+                
+                # Test multiple commands at this baud rate
+                for cmd_bytes, cmd_name in test_commands:
+                    try:
+                        with self._lock:
+                            # Clear buffers
+                            self.serial_port.reset_input_buffer()
+                            self.serial_port.reset_output_buffer()
+                            time.sleep(0.1)
+                            
+                            # Send command
+                            self.serial_port.write(cmd_bytes)
+                            self.serial_port.flush()
+                            
+                            # Wait for response
+                            time.sleep(0.5)
+                            response = self.serial_port.read(100)
+                            
+                            # Check if we got any response
+                            if len(response) > 0:
+                                logger.info(f"✓ Qibixx connection successful at {baud_rate} baud!")
+                                logger.info(f"  Command: {cmd_name} ({cmd_bytes.hex()}) → Response: {response.hex()}")
+                                
+                                # Update our baud rate to the working one
+                                self.baud_rate = baud_rate
+                                return True
+                                
+                    except Exception as e:
+                        logger.debug(f"Command {cmd_name} failed at {baud_rate} baud: {e}")
+                        continue
+                        
+                logger.debug(f"No responses at {baud_rate} baud")
+                
+            except Exception as e:
+                logger.debug(f"Failed to test {baud_rate} baud: {e}")
+                continue
+                
+        # Restore original baud rate if all failed
+        try:
+            if self.serial_port.is_open:
+                self.serial_port.close()
+            self.serial_port.baudrate = original_baud
+            self.serial_port.open()
         except Exception as e:
-            logger.error(f"Failed to test Qibixx connection: {e}")
-            return False
+            logger.error(f"Failed to restore original baud rate: {e}")
+            
+        logger.warning("No response from Qibixx hat at any tested baud rate")
+        return False
     
     def _read_response(self, timeout: float = 1.0) -> Optional[bytes]:
         """Read response from MDB device"""
@@ -341,25 +391,39 @@ class MDBController:
     def check_connection(self) -> bool:
         """Check if Qibixx MDB Pi Hat connection is healthy"""
         try:
-            # Send a simple SETUP command to test connection (we know this works)
-            if not self.serial_port or not self.serial_port.is_open:
-                return False
-                
-            with self._lock:
-                # Clear buffers
-                self.serial_port.reset_input_buffer()
-                self.serial_port.reset_output_buffer()
-                time.sleep(0.1)
-                
-                # Send SETUP command
-                self.serial_port.write(b'\x01')
-                self.serial_port.flush()
-                time.sleep(0.5)
-                
-                # Check for response
-                response = self.serial_port.read(100)
-                return len(response) > 0
-                
+            # Use adaptive connection test if not connected, quick test if already connected
+            if not self.is_connected:
+                # Do full adaptive baud rate detection
+                connection_result = self._test_qibixx_connection()
+                self.is_connected = connection_result
+                return connection_result
+            else:
+                # Quick health check with current settings
+                if not self.serial_port or not self.serial_port.is_open:
+                    self.is_connected = False
+                    return False
+                    
+                with self._lock:
+                    # Clear buffers
+                    self.serial_port.reset_input_buffer()
+                    self.serial_port.reset_output_buffer()
+                    time.sleep(0.1)
+                    
+                    # Send SETUP command (quick test)
+                    self.serial_port.write(b'\x01')
+                    self.serial_port.flush()
+                    time.sleep(0.5)
+                    
+                    # Check for response
+                    response = self.serial_port.read(100)
+                    if len(response) > 0:
+                        logger.debug(f"Connection check successful. Response: {response.hex()}")
+                        return True
+                    else:
+                        logger.warning("Connection lost - no response during health check")
+                        self.is_connected = False
+                        return False
+                        
         except Exception as e:
             logger.error(f"Qibixx connection check failed: {e}")
             self.is_connected = False

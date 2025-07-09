@@ -72,6 +72,8 @@
 - [ ] **2.5** Secure with provided standoffs/screws
 - [ ] **2.6** Verify HAT is seated properly (no bent pins)
 
+📖 **For comprehensive MDB setup and troubleshooting**: [`MDB_SETUP_GUIDE.md`](MDB_SETUP_GUIDE.md)
+
 ### 📺 Step 3: Connect LCD Display (20 minutes)
 
 Choose your connection method:

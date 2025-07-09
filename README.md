@@ -193,6 +193,8 @@ class VendingConfig:
 
 This section covers the complete setup procedure for both the MDB Pi HAT and 3.5" LCD display on Raspberry Pi running Ubuntu 24.04.
 
+📖 **For comprehensive MDB setup with troubleshooting**: [`guides/MDB_SETUP_GUIDE.md`](guides/MDB_SETUP_GUIDE.md)
+
 ### Prerequisites
 
 - Raspberry Pi 3B+, 4, or 5 (recommended: Pi 5 8GB)
