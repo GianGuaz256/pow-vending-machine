@@ -226,26 +226,43 @@ class VendingMachineSimulator:
                 self.current_invoice = invoice_data
                 logger.info(f"✓ Invoice created: {invoice_data['invoice_id']}")
                 
-                # Get payment URL
+                # Get Lightning invoice for QR code
+                lightning_invoice = invoice_data.get('lightning_invoice')
                 payment_url = invoice_data.get('payment_url')
-                if payment_url:
-                    # Show QR code for payment
-                    self.display.show_qr_code(payment_url, "Scan to Pay")
+                
+                # Debug: Show what we received
+                logger.debug(f"Lightning invoice available: {bool(lightning_invoice)}")
+                logger.debug(f"Payment URL available: {bool(payment_url)}")
+                if lightning_invoice:
+                    logger.debug(f"Lightning invoice starts with: {lightning_invoice[:20]}...")
+                
+                if lightning_invoice:
+                    # Show Lightning invoice QR code - this is what wallets scan directly
+                    self.display.show_qr_code(lightning_invoice, f"Pay €{product['price']:.2f}")
                     
-                    print(f"\n💳 PAYMENT REQUIRED")
+                    print(f"\n⚡ LIGHTNING PAYMENT REQUIRED")
                     print(f"Product: {product['name']}")
                     print(f"Amount: €{product['price']:.2f}")
                     print(f"Invoice ID: {invoice_data['invoice_id']}")
+                    print(f"Lightning Invoice: {lightning_invoice[:50]}...")
+                    if payment_url:
+                        print(f"Web Checkout (fallback): {payment_url}")
+                    print(f"\n📱 Scan Lightning QR code on display with your wallet")
+                    print(f"💡 This is a real Lightning Network invoice")
+                elif payment_url:
+                    # Fallback to web checkout if Lightning invoice unavailable
+                    self.display.show_qr_code(payment_url, "Scan to Pay")
+                    print(f"\n💳 WEB PAYMENT (Lightning unavailable)")
                     print(f"Payment URL: {payment_url}")
-                    print(f"\n📱 Scan QR code on display to pay")
-                    print(f"💡 Tip: The QR code is displayed on your miniHDMI screen")
-                    
-                    # Monitor payment
-                    self.monitor_payment(product)
+                    print(f"⚠️ Please use web checkout")
                 else:
-                    logger.error("No payment URL in invoice")
-                    self.display.show_error("Invoice Error")
+                    print(f"\n❌ No payment method available")
+                    self.display.show_error("No Payment Method")
                     wait_for_display(3)
+                    return
+                
+                # Monitor payment for any valid payment method
+                self.monitor_payment(product)
             else:
                 logger.error("Failed to create invoice")
                 self.display.show_error("Payment System Error")
