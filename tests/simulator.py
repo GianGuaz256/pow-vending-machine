@@ -236,9 +236,13 @@ class VendingMachineSimulator:
                 if lightning_invoice:
                     logger.debug(f"Lightning invoice starts with: {lightning_invoice[:20]}...")
                 
+                # Store QR data for monitoring display
+                qr_data = None
+                payment_type = None
+                
                 if lightning_invoice:
-                    # Show Lightning invoice QR code - this is what wallets scan directly
-                    self.display.show_qr_code(lightning_invoice, f"Pay €{product['price']:.2f}")
+                    qr_data = lightning_invoice
+                    payment_type = "⚡ LIGHTNING"
                     
                     print(f"\n⚡ LIGHTNING PAYMENT REQUIRED")
                     print(f"Product: {product['name']}")
@@ -250,8 +254,9 @@ class VendingMachineSimulator:
                     print(f"\n📱 Scan Lightning QR code on display with your wallet")
                     print(f"💡 This is a real Lightning Network invoice")
                 elif payment_url:
-                    # Fallback to web checkout if Lightning invoice unavailable
-                    self.display.show_qr_code(payment_url, "Scan to Pay")
+                    qr_data = payment_url
+                    payment_type = "💳 WEB"
+                    
                     print(f"\n💳 WEB PAYMENT (Lightning unavailable)")
                     print(f"Payment URL: {payment_url}")
                     print(f"⚠️ Please use web checkout")
@@ -260,6 +265,19 @@ class VendingMachineSimulator:
                     self.display.show_error("No Payment Method")
                     wait_for_display(3)
                     return
+                
+                # Store QR data for monitoring
+                self.current_invoice['qr_data'] = qr_data
+                self.current_invoice['payment_type'] = payment_type
+                
+                # Show initial QR code with status
+                self.display.show_qr_with_status(
+                    qr_data, 
+                    product['price'], 
+                    'EUR', 
+                    "Waiting...", 
+                    f"Pay €{product['price']:.2f}"
+                )
                 
                 # Monitor payment for any valid payment method
                 self.monitor_payment(product)
@@ -289,18 +307,32 @@ class VendingMachineSimulator:
         
         while elapsed < timeout:
             try:
-                # Update payment status display
+                # Update payment status display (keeping QR code visible)
                 remaining = timeout - elapsed
-                self.display.show_payment_status(
-                    product['price'], 
-                    'EUR', 
-                    f"Waiting ({remaining}s)"
-                )
+                qr_data = self.current_invoice.get('qr_data')
+                if qr_data:
+                    self.display.show_qr_with_status(
+                        qr_data,
+                        product['price'], 
+                        'EUR', 
+                        f"Waiting ({remaining}s)",
+                        f"Pay €{product['price']:.2f}"
+                    )
                 
                 # Check payment status
                 if self.btcpay.is_invoice_paid(invoice_id):
                     logger.info("🎉 Payment received!")
                     print("\n✅ PAYMENT RECEIVED!")
+                    # Show success with QR code still visible
+                    if qr_data:
+                        self.display.show_qr_with_status(
+                            qr_data,
+                            product['price'], 
+                            'EUR', 
+                            "PAID ✓",
+                            f"Pay €{product['price']:.2f}"
+                        )
+                        wait_for_display(2)
                     self.handle_payment_success(product)
                     return
                 
@@ -313,6 +345,16 @@ class VendingMachineSimulator:
                     if status in [InvoiceStatus.EXPIRED.value, InvoiceStatus.INVALID.value]:
                         logger.warning(f"Payment failed: {status}")
                         print(f"\n❌ Payment {status}")
+                        # Show failure with QR code still visible briefly
+                        if qr_data:
+                            self.display.show_qr_with_status(
+                                qr_data,
+                                product['price'], 
+                                'EUR', 
+                                f"{status} ✗",
+                                f"Pay €{product['price']:.2f}"
+                            )
+                            wait_for_display(2)
                         self.display.show_error(f"Payment {status}")
                         wait_for_display(3)
                         return
