@@ -74,7 +74,8 @@ class LCDDisplay:
             return
             
         with self._lock:
-            self.clear_screen()
+            # Clear screen without flipping
+            self.screen.fill((0, 0, 0))
             
             # Render title
             title_surface = self.font_large.render(title, True, title_color)
@@ -134,13 +135,16 @@ class LCDDisplay:
             qr_img = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
             
             # Convert PIL image to pygame surface
-            qr_mode = qr_img.mode
+            # Ensure image is in RGB mode for pygame compatibility
+            if qr_img.mode != 'RGB':
+                qr_img = qr_img.convert('RGB')
             qr_size = qr_img.size
             qr_data = qr_img.tobytes()
-            qr_surface = pygame.image.fromstring(qr_data, qr_size, qr_mode)
+            qr_surface = pygame.image.fromstring(qr_data, qr_size, 'RGB')
             
             with self._lock:
-                self.clear_screen()
+                # Clear screen without flipping
+                self.screen.fill((0, 0, 0))
                 
                 # Show title
                 title_surface = self.font_medium.render(title, True, (255, 255, 255))
@@ -172,7 +176,8 @@ class LCDDisplay:
         color = status_colors.get(status.lower(), (255, 255, 255))
         
         with self._lock:
-            self.clear_screen()
+            # Clear screen without flipping
+            self.screen.fill((0, 0, 0))
             
             # Amount
             amount_text = f"{amount:.2f} {currency}"
@@ -193,7 +198,8 @@ class LCDDisplay:
             return
             
         with self._lock:
-            self.clear_screen()
+            # Clear screen without flipping
+            self.screen.fill((0, 0, 0))
             
             # Show dispensing message
             title = "Dispensing..."
@@ -221,7 +227,8 @@ class LCDDisplay:
             return
             
         with self._lock:
-            self.clear_screen()
+            # Clear screen without flipping
+            self.screen.fill((0, 0, 0))
             
             # Title
             title_surface = self.font_large.render("System Status", True, (255, 255, 255))

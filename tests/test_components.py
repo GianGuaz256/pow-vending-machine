@@ -6,6 +6,7 @@ import sys
 import os
 import time
 import logging
+import pygame
 
 # Add project root and src to path for imports
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -35,6 +36,29 @@ logger.info("="*60)
 logger.info(f"Python version: {sys.version}")
 logger.info(f"Working directory: {os.getcwd()}")
 logger.info(f"Project root: {project_root}")
+
+def wait_for_display(duration: float) -> bool:
+    """Wait while processing pygame events - essential for display updates"""
+    if duration <= 0:
+        return True
+        
+    clock = pygame.time.Clock()
+    elapsed = 0
+    
+    while elapsed < duration * 1000:  # Convert to milliseconds
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                logger.info("Display window closed by user")
+                return False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    logger.info("Display test terminated by user (ESC key)")
+                    return False
+        
+        clock.tick(60)  # 60 FPS
+        elapsed += clock.get_time()
+    
+    return True
 
 class ComponentTestSuite:
     """Comprehensive Component Test Suite"""
@@ -123,7 +147,8 @@ class ComponentTestSuite:
                 # Test message display
                 logger.debug("Testing message display")
                 self.display.show_message("Test Message", "Display working correctly")
-                time.sleep(1)
+                if not wait_for_display(2):
+                    return False
                 self.log_test_result("LCD Message Display", True, "Message displayed successfully")
                 
                 # Test QR code display
@@ -131,7 +156,8 @@ class ComponentTestSuite:
                 test_qr_data = "bitcoin:bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh?amount=0.001"
                 try:
                     self.display.show_qr_code(test_qr_data, "Test QR Code")
-                    time.sleep(2)
+                    if not wait_for_display(3):
+                        return False
                     self.log_test_result("LCD QR Code Display", True, "QR code displayed successfully")
                 except Exception as qr_error:
                     logger.warning(f"QR code display failed: {qr_error}")
@@ -141,9 +167,11 @@ class ComponentTestSuite:
                 logger.debug("Testing payment status display")
                 try:
                     self.display.show_payment_status(2.50, "EUR", "waiting")
-                    time.sleep(1)
+                    if not wait_for_display(2):
+                        return False
                     self.display.show_payment_status(2.50, "EUR", "paid")
-                    time.sleep(1)
+                    if not wait_for_display(2):
+                        return False
                     self.log_test_result("LCD Payment Status", True, "Payment status displayed")
                 except Exception as status_error:
                     logger.warning(f"Payment status display failed: {status_error}")
@@ -153,7 +181,8 @@ class ComponentTestSuite:
                 logger.debug("Testing dispensing animation")
                 try:
                     self.display.show_dispensing("Test Item")
-                    time.sleep(1)
+                    if not wait_for_display(2):
+                        return False
                     self.log_test_result("LCD Dispensing Animation", True, "Animation displayed")
                 except Exception as anim_error:
                     logger.warning(f"Dispensing animation failed: {anim_error}")
@@ -163,7 +192,8 @@ class ComponentTestSuite:
                 logger.debug("Testing error display")
                 try:
                     self.display.show_error("Test error message")
-                    time.sleep(1)
+                    if not wait_for_display(2):
+                        return False
                     self.log_test_result("LCD Error Display", True, "Error message displayed")
                 except Exception as error_display_error:
                     logger.warning(f"Error display failed: {error_display_error}")
@@ -173,7 +203,8 @@ class ComponentTestSuite:
                 logger.debug("Testing system status display")
                 try:
                     self.display.show_system_status(True, True, True)
-                    time.sleep(1)
+                    if not wait_for_display(2):
+                        return False
                     self.log_test_result("LCD System Status", True, "System status displayed")
                 except Exception as sys_status_error:
                     logger.warning(f"System status display failed: {sys_status_error}")
