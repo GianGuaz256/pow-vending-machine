@@ -17,8 +17,9 @@ class LCDDisplay:
     """Controller for Waveshare 3.5 inch LCD display"""
     
     def __init__(self):
-        self.width = config.display.width
-        self.height = config.display.height
+        # Use larger display size for better visibility
+        self.width = max(config.display.width, 640)
+        self.height = max(config.display.height, 480)
         self.screen = None
         self.font_small = None
         self.font_medium = None
@@ -36,16 +37,16 @@ class LCDDisplay:
             self.screen = pygame.display.set_mode((self.width, self.height))
             pygame.display.set_caption("Bitcoin Vending Machine")
             
-            # Load fonts
+            # Load fonts (increased sizes for better visibility)
             try:
-                self.font_small = pygame.font.Font(None, 24)
-                self.font_medium = pygame.font.Font(None, 36)
-                self.font_large = pygame.font.Font(None, 48)
+                self.font_small = pygame.font.Font(None, 32)
+                self.font_medium = pygame.font.Font(None, 48)
+                self.font_large = pygame.font.Font(None, 64)
             except:
                 # Fallback to default font
-                self.font_small = pygame.font.Font(None, 24)
-                self.font_medium = pygame.font.Font(None, 32)
-                self.font_large = pygame.font.Font(None, 40)
+                self.font_small = pygame.font.Font(None, 28)
+                self.font_medium = pygame.font.Font(None, 42)
+                self.font_large = pygame.font.Font(None, 56)
             
             self.is_initialized = True
             self.clear_screen()
@@ -72,6 +73,11 @@ class LCDDisplay:
         """Display a message with title"""
         if not self.is_initialized:
             return
+        
+        # Debug output so user can see what's displayed
+        print(f"🖥️  DISPLAY: {title}")
+        if message:
+            print(f"     {message}")
             
         with self._lock:
             # Clear screen without flipping
@@ -115,6 +121,10 @@ class LCDDisplay:
         """Display a QR code with title"""
         if not self.is_initialized:
             return
+        
+        # Debug output so user can see what's displayed
+        print(f"🖥️  DISPLAY QR: {title}")
+        print(f"     QR Data: {data[:80]}{'...' if len(data) > 80 else ''}")
             
         try:
             # Generate QR code
@@ -165,6 +175,9 @@ class LCDDisplay:
         """Display payment status"""
         if not self.is_initialized:
             return
+        
+        # Debug output so user can see what's displayed
+        print(f"🖥️  DISPLAY PAYMENT: {amount:.2f} {currency} - {status.upper()}")
             
         status_colors = {
             "waiting": (255, 255, 0),    # Yellow
@@ -196,6 +209,9 @@ class LCDDisplay:
         """Show item dispensing animation"""
         if not self.is_initialized:
             return
+        
+        # Debug output so user can see what's displayed
+        print(f"🖥️  DISPLAY DISPENSING: {item_name}")
             
         with self._lock:
             # Clear screen without flipping
@@ -217,6 +233,9 @@ class LCDDisplay:
     
     def show_error(self, error_message: str):
         """Display error message"""
+        # Debug output so user can see what's displayed
+        print(f"🖥️  DISPLAY ERROR: {error_message}")
+        
         self.show_message("ERROR", error_message, 
                          title_color=(255, 0, 0), 
                          message_color=(255, 200, 200))

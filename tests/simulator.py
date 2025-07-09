@@ -154,6 +154,9 @@ class VendingMachineSimulator:
         print("  9. Test Mode")
         print("  0. Exit")
         print("="*50)
+        print("💡 Visual output shows on your miniHDMI display")
+        print("📱 QR codes for payment will appear on the display")
+        print("⌨️  Use terminal for product selection")
     
     def get_user_selection(self) -> str:
         """Get user input from terminal"""
@@ -221,10 +224,10 @@ class VendingMachineSimulator:
             
             if invoice_data:
                 self.current_invoice = invoice_data
-                logger.info(f"✓ Invoice created: {invoice_data['id']}")
+                logger.info(f"✓ Invoice created: {invoice_data['invoice_id']}")
                 
                 # Get payment URL
-                payment_url = invoice_data.get('checkoutLink')
+                payment_url = invoice_data.get('payment_url')
                 if payment_url:
                     # Show QR code for payment
                     self.display.show_qr_code(payment_url, "Scan to Pay")
@@ -232,9 +235,10 @@ class VendingMachineSimulator:
                     print(f"\n💳 PAYMENT REQUIRED")
                     print(f"Product: {product['name']}")
                     print(f"Amount: €{product['price']:.2f}")
-                    print(f"Invoice ID: {invoice_data['id']}")
+                    print(f"Invoice ID: {invoice_data['invoice_id']}")
                     print(f"Payment URL: {payment_url}")
                     print(f"\n📱 Scan QR code on display to pay")
+                    print(f"💡 Tip: The QR code is displayed on your miniHDMI screen")
                     
                     # Monitor payment
                     self.monitor_payment(product)
@@ -259,7 +263,7 @@ class VendingMachineSimulator:
         if not self.current_invoice:
             return
             
-        invoice_id = self.current_invoice['id']
+        invoice_id = self.current_invoice['invoice_id']
         timeout = 300  # 5 minutes
         check_interval = 5  # Check every 5 seconds
         elapsed = 0
@@ -277,20 +281,24 @@ class VendingMachineSimulator:
                 )
                 
                 # Check payment status
-                status = self.btcpay.get_invoice_status(invoice_id)
-                logger.debug(f"Payment status: {status}")
-                
-                if status == InvoiceStatus.PAID:
+                if self.btcpay.is_invoice_paid(invoice_id):
                     logger.info("🎉 Payment received!")
                     print("\n✅ PAYMENT RECEIVED!")
                     self.handle_payment_success(product)
                     return
-                elif status in [InvoiceStatus.EXPIRED, InvoiceStatus.INVALID]:
-                    logger.warning(f"Payment failed: {status}")
-                    print(f"\n❌ Payment {status.value}")
-                    self.display.show_error(f"Payment {status.value}")
-                    wait_for_display(3)
-                    return
+                
+                # Check for expired/invalid status
+                status_info = self.btcpay.get_invoice_status(invoice_id)
+                if status_info:
+                    status = status_info.get('status', '')
+                    logger.debug(f"Payment status: {status}")
+                    
+                    if status in [InvoiceStatus.EXPIRED.value, InvoiceStatus.INVALID.value]:
+                        logger.warning(f"Payment failed: {status}")
+                        print(f"\n❌ Payment {status}")
+                        self.display.show_error(f"Payment {status}")
+                        wait_for_display(3)
+                        return
                 
                 # Wait and check again
                 if not wait_for_display(check_interval):
@@ -341,7 +349,7 @@ class VendingMachineSimulator:
         """Cancel current invoice"""
         if self.current_invoice and self.btcpay:
             try:
-                invoice_id = self.current_invoice['id']
+                invoice_id = self.current_invoice['invoice_id']
                 self.btcpay.cancel_invoice(invoice_id)
                 logger.info(f"Invoice {invoice_id} cancelled")
             except Exception as e:
@@ -436,7 +444,7 @@ class VendingMachineSimulator:
             # Create and cancel test invoice
             invoice = self.btcpay.create_invoice(0.01, 'EUR', 'Test invoice')
             if invoice:
-                self.btcpay.cancel_invoice(invoice['id'])
+                self.btcpay.cancel_invoice(invoice['invoice_id'])
                 self.display.show_message("BTCPay Test", "✅ Connection OK")
                 wait_for_display(2)
                 return True
