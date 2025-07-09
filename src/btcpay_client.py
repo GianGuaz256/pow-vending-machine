@@ -157,11 +157,64 @@ class BTCPayClient:
         try:
             response = self._make_request('GET', f'/api/v1/stores/{self.store_id}/invoices/{invoice_id}/payment-methods')
             
+            logger.debug(f"Payment methods response for {invoice_id}: {json.dumps(response, indent=2) if response else 'None'}")
+            
             if response:
                 for payment_method in response:
+                    logger.debug(f"Checking payment method: {payment_method.get('paymentMethod')}")
+                    
                     if payment_method.get('paymentMethod') == 'BTC-LightningNetwork':
-                        return payment_method.get('destination')
+                        # Try different possible fields where Lightning invoice might be stored
+                        lightning_invoice = (
+                            payment_method.get('destination') or
+                            payment_method.get('paymentLink') or
+                            payment_method.get('invoiceId') or
+                            payment_method.get('lightningInvoice') or
+                            payment_method.get('invoice')
+                        )
+                        
+                        logger.debug(f"Lightning invoice found: {lightning_invoice[:50] if lightning_invoice else 'None'}...")
+                        
+                        if lightning_invoice and lightning_invoice.startswith(('lnbc', 'lntb', 'lnbcrt')):
+                            logger.info(f"✓ Valid Lightning invoice extracted: {lightning_invoice[:50]}...")
+                            return lightning_invoice
+                        else:
+                            logger.warning(f"Invalid Lightning invoice format: {lightning_invoice}")
             
+            # If payment methods endpoint doesn't work, try getting it from the main invoice data
+            logger.debug("Trying to get Lightning invoice from main invoice endpoint...")
+            invoice_response = self._make_request('GET', f'/api/v1/stores/{self.store_id}/invoices/{invoice_id}')
+            
+            if invoice_response:
+                logger.debug(f"Main invoice response keys: {list(invoice_response.keys())}")
+                
+                # Check various possible locations in the invoice response
+                lightning_invoice = None
+                
+                # Check if there's a lightning-specific field
+                if 'lightning' in invoice_response:
+                    lightning_data = invoice_response['lightning']
+                    lightning_invoice = lightning_data.get('paymentRequest') or lightning_data.get('invoice')
+                
+                # Check if there's payment methods data embedded
+                if not lightning_invoice and 'availablePaymentMethods' in invoice_response:
+                    for method in invoice_response['availablePaymentMethods']:
+                        if 'lightning' in method.get('paymentMethod', '').lower():
+                            lightning_invoice = method.get('destination') or method.get('paymentLink')
+                            break
+                
+                # Check cryptoInfo (older BTCPay versions)
+                if not lightning_invoice and 'cryptoInfo' in invoice_response:
+                    for crypto in invoice_response['cryptoInfo']:
+                        if crypto.get('cryptoCode') == 'BTC' and 'lightning' in crypto.get('paymentType', '').lower():
+                            lightning_invoice = crypto.get('paymentUrls', {}).get('BOLT11')
+                            break
+                
+                if lightning_invoice and lightning_invoice.startswith(('lnbc', 'lntb', 'lnbcrt')):
+                    logger.info(f"✓ Lightning invoice found in main response: {lightning_invoice[:50]}...")
+                    return lightning_invoice
+            
+            logger.warning("No valid Lightning invoice found in any response")
             return None
             
         except Exception as e:

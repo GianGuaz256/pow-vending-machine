@@ -26,6 +26,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Reduce noise from external libraries but keep our debug info
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+logging.getLogger('requests').setLevel(logging.WARNING)
+logging.getLogger('pygame').setLevel(logging.WARNING)
+
 # Log system information
 logger.info("="*60)
 logger.info("VENDING MACHINE SIMULATOR SESSION STARTED")
@@ -235,6 +240,44 @@ class VendingMachineSimulator:
                 logger.debug(f"Payment URL available: {bool(payment_url)}")
                 if lightning_invoice:
                     logger.debug(f"Lightning invoice starts with: {lightning_invoice[:20]}...")
+                    logger.debug(f"Lightning invoice length: {len(lightning_invoice)}")
+                    # Check if it's actually a Lightning invoice (should start with ln)
+                    if not lightning_invoice.startswith(('lnbc', 'lntb', 'lnbcrt')):
+                        logger.warning(f"⚠️ Lightning invoice doesn't start with ln: {lightning_invoice[:100]}")
+                        logger.warning("This looks like a web URL, not a Lightning invoice!")
+                        # Force use of payment_url instead
+                        lightning_invoice = None
+                
+                # Debug: Show raw invoice data structure
+                logger.debug("=== RAW INVOICE DATA DEBUG ===")
+                import json
+                logger.debug(f"Full invoice_data keys: {list(invoice_data.keys())}")
+                for key, value in invoice_data.items():
+                    if isinstance(value, str) and len(value) > 100:
+                        logger.debug(f"{key}: {value[:100]}...")
+                    else:
+                        logger.debug(f"{key}: {value}")
+                logger.debug("=== END RAW INVOICE DATA ===")
+                
+                # Try to get raw invoice from BTCPay to debug
+                if hasattr(self.btcpay, '_make_request'):
+                    logger.debug("=== DEBUGGING RAW BTCPAY RESPONSES ===")
+                    invoice_id = invoice_data['invoice_id']
+                    
+                    # Get raw invoice data
+                    raw_invoice = self.btcpay._make_request('GET', f'/api/v1/stores/{self.btcpay.store_id}/invoices/{invoice_id}')
+                    if raw_invoice:
+                        logger.debug(f"Raw invoice keys: {list(raw_invoice.keys())}")
+                        
+                    # Get raw payment methods
+                    raw_payment_methods = self.btcpay._make_request('GET', f'/api/v1/stores/{self.btcpay.store_id}/invoices/{invoice_id}/payment-methods')
+                    if raw_payment_methods:
+                        logger.debug(f"Raw payment methods: {json.dumps(raw_payment_methods, indent=2)}")
+                    
+                    logger.debug("=== END BTCPAY DEBUG ===")
+                
+                logger.debug(f"Final lightning_invoice check: {lightning_invoice is not None}")
+                logger.debug(f"Final payment_url check: {payment_url is not None}")
                 
                 # Store QR data for monitoring display
                 qr_data = None
