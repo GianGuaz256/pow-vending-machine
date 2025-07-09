@@ -44,6 +44,8 @@ class MDBController:
         self._lock = threading.Lock()
         self._running = False
         self._poll_thread = None
+        # Initialize baud_rate from config to prevent AttributeError
+        self.baud_rate = config.mdb.baud_rate
         
     def initialize(self) -> bool:
         """Initialize MDB connection"""
