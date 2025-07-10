@@ -108,7 +108,7 @@ class BTCPayClient:
     
     def create_invoice(self, amount: float, currency: str = "EUR", 
                       description: str = "Vending Machine Purchase") -> Optional[Dict[str, Any]]:
-        """Create a new invoice"""
+        """Create a new invoice with Lightning Network preference"""
         try:
             invoice_data = {
                 "amount": str(amount),
@@ -153,73 +153,94 @@ class BTCPayClient:
             return None
     
     def _get_lightning_invoice(self, invoice_id: str) -> Optional[str]:
-        """Get Lightning Network invoice string"""
-        try:
-            response = self._make_request('GET', f'/api/v1/stores/{self.store_id}/invoices/{invoice_id}/payment-methods')
-            
-            logger.debug(f"Payment methods response for {invoice_id}: {json.dumps(response, indent=2) if response else 'None'}")
-            
-            if response:
-                for payment_method in response:
-                    logger.debug(f"Checking payment method: {payment_method.get('paymentMethod')}")
+        """Get Lightning Network invoice string with retries"""
+        max_retries = 3
+        retry_delay = 2  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                if attempt > 0:
+                    logger.debug(f"Retry {attempt}/{max_retries} for Lightning invoice {invoice_id}")
+                    time.sleep(retry_delay)
+                
+                # Try payment methods endpoint first
+                response = self._make_request('GET', f'/api/v1/stores/{self.store_id}/invoices/{invoice_id}/payment-methods')
+                
+                if response:
+                    logger.debug(f"Payment methods response for {invoice_id}: {json.dumps(response, indent=2)}")
                     
-                    if payment_method.get('paymentMethod') == 'BTC-LightningNetwork':
-                        # Try different possible fields where Lightning invoice might be stored
-                        lightning_invoice = (
-                            payment_method.get('destination') or
-                            payment_method.get('paymentLink') or
-                            payment_method.get('invoiceId') or
-                            payment_method.get('lightningInvoice') or
-                            payment_method.get('invoice')
-                        )
+                    for payment_method in response:
+                        method_type = payment_method.get('paymentMethod', '')
+                        logger.debug(f"Checking payment method: {method_type}")
                         
-                        logger.debug(f"Lightning invoice found: {lightning_invoice[:50] if lightning_invoice else 'None'}...")
+                        if method_type == 'BTC-LightningNetwork':
+                            # Try all possible fields where Lightning invoice might be stored
+                            possible_fields = [
+                                'destination', 'paymentLink', 'invoiceId', 'lightningInvoice', 
+                                'invoice', 'bolt11', 'paymentRequest', 'ln', 'lightning_invoice'
+                            ]
+                            
+                            for field in possible_fields:
+                                lightning_invoice = payment_method.get(field)
+                                if lightning_invoice and lightning_invoice.startswith(('lnbc', 'lntb', 'lnbcrt')):
+                                    logger.info(f"✓ Valid Lightning invoice found in field '{field}': {lightning_invoice[:50]}...")
+                                    return lightning_invoice
+                            
+                            # If no direct field worked, check nested data
+                            for key, value in payment_method.items():
+                                if isinstance(value, dict):
+                                    for subkey, subvalue in value.items():
+                                        if isinstance(subvalue, str) and subvalue.startswith(('lnbc', 'lntb', 'lnbcrt')):
+                                            logger.info(f"✓ Lightning invoice found in nested field '{key}.{subkey}': {subvalue[:50]}...")
+                                            return subvalue
+                
+                # Try main invoice endpoint as fallback
+                logger.debug("Trying main invoice endpoint for Lightning invoice...")
+                invoice_response = self._make_request('GET', f'/api/v1/stores/{self.store_id}/invoices/{invoice_id}')
+                
+                if invoice_response:
+                    logger.debug(f"Main invoice response keys: {list(invoice_response.keys())}")
+                    
+                    # Comprehensive search through the entire response
+                    lightning_invoice = self._extract_lightning_from_response(invoice_response)
+                    if lightning_invoice:
+                        return lightning_invoice
+                
+                logger.debug(f"Attempt {attempt + 1} failed to find Lightning invoice")
+                
+            except Exception as e:
+                logger.error(f"Error getting Lightning invoice (attempt {attempt + 1}): {e}")
+        
+        logger.warning(f"Failed to find Lightning invoice after {max_retries} attempts")
+        return None
+    
+    def _extract_lightning_from_response(self, response: Dict) -> Optional[str]:
+        """Recursively extract Lightning invoice from response data"""
+        def search_dict(data, path=""):
+            if isinstance(data, dict):
+                for key, value in data.items():
+                    current_path = f"{path}.{key}" if path else key
+                    
+                    # Check if this value is a Lightning invoice
+                    if isinstance(value, str) and value.startswith(('lnbc', 'lntb', 'lnbcrt')):
+                        logger.info(f"✓ Lightning invoice found at path '{current_path}': {value[:50]}...")
+                        return value
+                    
+                    # Recursively search nested dictionaries and lists
+                    result = search_dict(value, current_path)
+                    if result:
+                        return result
                         
-                        if lightning_invoice and lightning_invoice.startswith(('lnbc', 'lntb', 'lnbcrt')):
-                            logger.info(f"✓ Valid Lightning invoice extracted: {lightning_invoice[:50]}...")
-                            return lightning_invoice
-                        else:
-                            logger.warning(f"Invalid Lightning invoice format: {lightning_invoice}")
+            elif isinstance(data, list):
+                for i, item in enumerate(data):
+                    current_path = f"{path}[{i}]" if path else f"[{i}]"
+                    result = search_dict(item, current_path)
+                    if result:
+                        return result
             
-            # If payment methods endpoint doesn't work, try getting it from the main invoice data
-            logger.debug("Trying to get Lightning invoice from main invoice endpoint...")
-            invoice_response = self._make_request('GET', f'/api/v1/stores/{self.store_id}/invoices/{invoice_id}')
-            
-            if invoice_response:
-                logger.debug(f"Main invoice response keys: {list(invoice_response.keys())}")
-                
-                # Check various possible locations in the invoice response
-                lightning_invoice = None
-                
-                # Check if there's a lightning-specific field
-                if 'lightning' in invoice_response:
-                    lightning_data = invoice_response['lightning']
-                    lightning_invoice = lightning_data.get('paymentRequest') or lightning_data.get('invoice')
-                
-                # Check if there's payment methods data embedded
-                if not lightning_invoice and 'availablePaymentMethods' in invoice_response:
-                    for method in invoice_response['availablePaymentMethods']:
-                        if 'lightning' in method.get('paymentMethod', '').lower():
-                            lightning_invoice = method.get('destination') or method.get('paymentLink')
-                            break
-                
-                # Check cryptoInfo (older BTCPay versions)
-                if not lightning_invoice and 'cryptoInfo' in invoice_response:
-                    for crypto in invoice_response['cryptoInfo']:
-                        if crypto.get('cryptoCode') == 'BTC' and 'lightning' in crypto.get('paymentType', '').lower():
-                            lightning_invoice = crypto.get('paymentUrls', {}).get('BOLT11')
-                            break
-                
-                if lightning_invoice and lightning_invoice.startswith(('lnbc', 'lntb', 'lnbcrt')):
-                    logger.info(f"✓ Lightning invoice found in main response: {lightning_invoice[:50]}...")
-                    return lightning_invoice
-            
-            logger.warning("No valid Lightning invoice found in any response")
             return None
-            
-        except Exception as e:
-            logger.error(f"Error getting Lightning invoice: {e}")
-            return None
+        
+        return search_dict(response)
     
     def get_invoice_status(self, invoice_id: str) -> Optional[Dict[str, Any]]:
         """Get current invoice status"""
