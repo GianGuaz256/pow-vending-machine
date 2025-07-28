@@ -57,7 +57,7 @@ This guide covers **Qibixx MDB Pi HAT** (GPIO-based), **Qibixx MDB USB Interface
    # Should show: /dev/ttyACM0
    ```
 
-### **Pi HAT Setup (Option B)**
+### **Pi HAT Setup (Options B & C)**
 
 1. **Physical Installation**
    - Power down Raspberry Pi completely
@@ -72,41 +72,141 @@ This guide covers **Qibixx MDB Pi HAT** (GPIO-based), **Qibixx MDB USB Interface
 
 ---
 
+## ⚙️ **Raspberry Pi UART Configuration**
+
+### **Pi and UARTs - Official Qibixx Instructions**
+
+The MDB Pi HAT interface provides a UART which the device uses for communication. However, with recent additions to the RPi line, UART usage requires specific configuration.
+
+⚠️ **Warning**: Older Raspbian versions work differently. Ensure you have the latest available version!
+
+ℹ️ **Note**: Different Pi models and operating systems need specific configurations. If in doubt, use the MDB-USB Interface instead.
+
+### **Setup Pi HAT - Raspbian/Raspberry Pi OS**
+
+#### **Step 1: Disable Console Login on Serial Port**
+
+**Method A: Using raspi-config (Recommended)**
+```bash
+sudo raspi-config
+```
+
+1. Select **Interface Options** (usually option 3)
+2. Select **Serial Port** (P6)
+3. **"Would you like a login shell to be accessible over serial?"** → Select **"No"**
+4. **"Would you like the serial port hardware to be enabled?"** → Select **"Yes"**
+
+**Method B: Manual Configuration**
+
+Edit the boot command line:
+
+⚠️ **Raspberry Pi 5**: Use `/boot/firmware/cmdline.txt`  
+⚠️ **Raspberry Pi 1-4**: Use `/boot/cmdline.txt`
+
+```bash
+# For Pi 5
+sudo nano /boot/firmware/cmdline.txt
+
+# For Pi 1-4  
+sudo nano /boot/cmdline.txt
+```
+
+**Remove this text** (keep the rest of the line intact):
+```
+console=serial0,115200
+```
+
+ℹ️ **Important**: After editing, ensure the file remains as one single line!
+
+#### **Step 2: Disable Bluetooth Handler**
+
+```bash
+sudo systemctl disable hciuart
+```
+
+#### **Step 3: Disable Bluetooth UART Assignment**
+
+First, check which overlay to use:
+```bash
+ls -la /boot/overlays/ | grep disable
+```
+
+You'll see either `disable-bt.dtbo` or `pi3-disable-bt.dtbo`. Use the filename without `.dtbo`.
+
+Edit the boot configuration:
+
+⚠️ **Raspberry Pi 5**: Use `/boot/firmware/config.txt`  
+⚠️ **Raspberry Pi 1-4**: Use `/boot/config.txt`
+
+```bash
+# For Pi 5
+sudo nano /boot/firmware/config.txt
+
+# For Pi 1-4
+sudo nano /boot/config.txt
+```
+
+**Add these lines to the end:**
+
+**For Raspberry Pi 1, 2, 3, and 4:**
+```bash
+dtoverlay=disable-bt
+enable_uart=1
+```
+
+**For Raspberry Pi 5:**
+```bash
+dtoverlay=disable-bt
+enable_uart=1
+dtparam=uart0=on
+```
+
+#### **Step 4: Reboot**
+```bash
+sudo reboot
+```
+
+✅ **Success**: After reboot, the full UART (PL011) should be connected to the Pi HAT!
+
+---
+
+## 🎛️ **GPIO Control Setup**
+
+### **GPIO 6 Control Using pinctrl (Recommended)**
+
+The MDB Pi HAT requires GPIO 6 control for proper operation. Use `pinctrl` from the `raspi-utils` package:
+
+#### **Install pinctrl (if needed)**
+```bash
+sudo apt install raspi-utils
+```
+
+#### **GPIO 6 Control Commands**
+```bash
+# Set GPIO 6 (BCM numbering) as output and drive LOW
+sudo pinctrl set 6 op dl
+
+# Set GPIO 6 HIGH  
+sudo pinctrl set 6 op dh
+
+# Set GPIO 6 as input
+sudo pinctrl set 6 ip
+
+# Check GPIO 6 status
+pinctrl get 6
+```
+
+ℹ️ **Note**: This uses BCM pin numbers directly and works on Pi 5 without sysfs issues.
+
+---
+
 ## ⚙️ Software Configuration
 
 ### **For Hybrid Pi HAT (YOUR SETUP)** ⭐
 
 Your setup uses a **Qibixx MDB Pi HAT** with **text-based commands** at **115200 baud** on `/dev/ttyAMA0`.
 
-#### 1. **Enable UART Communication**
-Edit the boot configuration:
-```bash
-sudo nano /boot/firmware/config.txt
-```
-
-Add these lines:
-```bash
-# Enable UART for MDB HAT
-enable_uart=1
-dtparam=uart=on
-dtparam=uart0=on
-
-# Disable Bluetooth to free up UART
-dtoverlay=disable-bt
-dtoverlay=uart0
-```
-
-#### 2. **Disable Serial Console**
-```bash
-sudo nano /boot/firmware/cmdline.txt
-```
-
-Remove these parts if present:
-```bash
-console=serial0,115200 console=ttyAMA0,115200
-```
-
-#### 3. **Configure Environment**
+#### **Configure Environment**
 Create/edit `.env` file:
 ```bash
 nano .env
@@ -120,7 +220,7 @@ MDB_BAUD_RATE=115200
 MDB_TIMEOUT=50.0
 ```
 
-#### 4. **Set Permissions**
+#### **Set Permissions**
 ```bash
 # Add user to dialout group
 sudo usermod -a -G dialout $USER
@@ -128,26 +228,9 @@ sudo usermod -a -G dialout $USER
 # Logout and login again for changes to take effect
 ```
 
-#### 5. **Reboot**
-```bash
-sudo reboot
-```
-
 ### **For USB Interface (Option A)**
 
-#### 1. **Install Dependencies**
-```bash
-cd ~/pow-vending-machine
-pip install -r requirements.txt
-```
-
-#### 2. **Configure Environment**
-Create/edit `.env` file:
-```bash
-nano .env
-```
-
-Add USB MDB configuration:
+#### **Configure Environment**
 ```bash
 # MDB USB Interface Configuration
 MDB_SERIAL_PORT=/dev/ttyACM0
@@ -155,21 +238,76 @@ MDB_BAUD_RATE=115200
 MDB_TIMEOUT=50.0
 ```
 
-#### 3. **Set Permissions**
+#### **Set Permissions**
 ```bash
-# Add user to dialout group for USB access
 sudo usermod -a -G dialout $USER
-
-# Logout and login again for changes to take effect
 ```
 
 ### **For Traditional Pi HAT (Option C)**
 
+Follow the same UART setup steps above, then:
+
+```bash
+# Traditional Pi HAT Configuration
+MDB_SERIAL_PORT=/dev/ttyAMA0
+MDB_BAUD_RATE=38400
+MDB_TIMEOUT=1.0
+```
+
 ---
 
-## 🧪 Testing and Verification
+## 🧪 **Testing and Verification**
 
-### **Test Your Hybrid Pi HAT Setup** ⭐
+### **Step 1: Verify UART Device Exists**
+
+After UART configuration and reboot:
+```bash
+ls -la /dev/ttyAMA*
+```
+
+You should see:
+```
+crw-rw---- 1 root dialout 204, 64 [date] /dev/ttyAMA0
+```
+
+### **Step 2: Test with Minicom (Official Method)**
+
+**Install minicom:**
+```bash
+sudo apt-get install minicom
+```
+
+**Test the interface:**
+```bash
+sudo minicom -b 115200 -D /dev/ttyAMA0
+```
+
+**Enable local echo** (to see what you type):
+- Press `CTRL+A` then `Z` then `E`
+
+**Send test command:**
+- Type `V` and press `Enter`
+- You should see response like: `v,4.0.2.0,7de04655363231164c343132`
+
+**Exit minicom:**
+- Press `CTRL+A` then `X`
+
+### **Step 3: Set GPIO 6 Control**
+
+**Initialize GPIO 6 for HAT communication:**
+```bash
+# Set GPIO 6 as output and drive high (initialize HAT)
+sudo pinctrl set 6 op dh
+
+# Verify setting
+pinctrl get 6
+```
+
+### **Step 4: Test Again with Minicom**
+
+Repeat the minicom test to ensure HAT communication is working properly.
+
+### **Step 5: Test Your Hybrid Pi HAT Setup** ⭐
 
 Your device should now be working! Run these tests:
 
@@ -193,17 +331,7 @@ python tests/mdb_usb_test.py
 
 **Expected output:**
 ```
-🎉 All tests passed! MDB interface is working correctly.
-```
-
-#### **Manual Test with Minicom**
-```bash
-sudo minicom -b 115200 -D /dev/ttyAMA0
-```
-
-Type `V` and press Enter. You should see:
-```
-v,4.0.2.0,7de04655363231164c343132
+🎉 All tests passed! Hybrid MDB Pi HAT is working correctly.
 ```
 
 ### **Test USB Interface**
@@ -231,28 +359,38 @@ python tests/test_mdb.py
 
 ---
 
+## 🔍 **Serial Interface Parameters**
+
+The MDB Pi HAT communicates using these parameters:
+- **Baudrate**: 115200
+- **Parity**: None  
+- **Data Bits**: 8
+- **Stop Bits**: 1
+
+---
+
 ## 📊 **Understanding the Differences**
 
-| Feature | USB Interface | Pi HAT |
-|---------|---------------|---------|
-| **Connection** | `/dev/ttyACM0` | `/dev/ttyAMA0` |
-| **Baud Rate** | 115200 | 38400 (adaptive) |
-| **Commands** | Text (`V\n`) | Binary (`0x01`) |
-| **Setup Complexity** | Low | Medium |
-| **GPIO Requirements** | None | UART + GPIO6 |
-| **Response Format** | ASCII text | Binary data |
+| Feature | USB Interface | Hybrid Pi HAT | Traditional Pi HAT |
+|---------|---------------|---------------|-------------------|
+| **Connection** | `/dev/ttyACM0` | `/dev/ttyAMA0` | `/dev/ttyAMA0` |
+| **Baud Rate** | 115200 | 115200 | 38400 (adaptive) |
+| **Commands** | Text (`V\n`) | Text (`V\n`) | Binary (`0x01`) |
+| **Setup Complexity** | Low | Medium | High |
+| **GPIO Requirements** | None | UART + GPIO6 | UART + GPIO6 |
+| **Response Format** | ASCII text | ASCII text | Binary data |
 
 ### **Command Examples**
 
-**USB Interface:**
+**USB Interface & Hybrid Pi HAT:**
 ```python
 import serial
-ser = serial.Serial('/dev/ttyACM0', 115200, timeout=50)
+ser = serial.Serial('/dev/ttyAMA0', 115200, timeout=50)
 ser.write(b'V\n')  # Version command
 response = ser.readline().decode('ascii')
 ```
 
-**Pi HAT:**
+**Traditional Pi HAT:**
 ```python
 import serial
 ser = serial.Serial('/dev/ttyAMA0', 38400, timeout=1)
@@ -264,17 +402,13 @@ response = ser.read(100)  # Binary response
 
 ## 🚨 Troubleshooting
 
-### **USB Interface Issues**
+### **UART Issues**
 
-**Problem: `No such file or directory: '/dev/ttyACM0'`**
-```bash
-# Check available USB devices
-ls -la /dev/ttyACM*
-ls -la /dev/ttyUSB*
-
-# Check USB connections
-lsusb
-```
+**Problem: `No such file or directory: '/dev/ttyAMA0'`**
+1. Check UART is enabled in boot config
+2. Verify Bluetooth is disabled  
+3. Reboot the Pi
+4. Check device exists: `ls -la /dev/ttyAMA*`
 
 **Problem: `Permission denied`**
 ```bash
@@ -282,21 +416,36 @@ lsusb
 sudo usermod -a -G dialout $USER
 
 # Check permissions
-ls -la /dev/ttyACM0
+ls -la /dev/ttyAMA0
 
 # Logout and login again
+```
+
+### **GPIO Issues**
+
+**Problem: GPIO 6 control fails**
+```bash
+# Install raspi-utils if needed
+sudo apt install raspi-utils
+
+# Set GPIO 6 high
+sudo pinctrl set 6 op dh
+
+# Check status
+pinctrl get 6
 ```
 
 ### **Pi HAT Issues**
 
 **Problem: `No response from device`**
-- Check GPIO6 control
+- Check GPIO6 control with `pinctrl`
 - Verify UART configuration
-- Test different baud rates (38400, 19200, 9600)
+- Test with minicom first
+- Ensure HAT is properly seated
 
 **Problem: `Bluetooth interference`**
-- Disable Bluetooth services
-- Check `/boot/firmware/config.txt`
+- Disable Bluetooth services: `sudo systemctl disable hciuart`
+- Check `/boot/firmware/config.txt` for `dtoverlay=disable-bt`
 
 ---
 
@@ -308,11 +457,17 @@ ls -la /dev/ttyACM0
 - [ ] Environment configured with `MDB_SERIAL_PORT=/dev/ttyACM0`
 - [ ] Test passes: `python tests/mdb_usb_test.py`
 
-### **Pi HAT** ✅  
+### **Hybrid Pi HAT** ✅  
 - [ ] HAT physically mounted on GPIO pins
-- [ ] UART enabled in `/boot/firmware/config.txt`
+- [ ] UART enabled in boot config
 - [ ] Bluetooth disabled
 - [ ] Serial console removed from cmdline.txt
+- [ ] GPIO 6 control working: `sudo pinctrl set 6 op dh`
+- [ ] Minicom test successful: `sudo minicom -b 115200 -D /dev/ttyAMA0`
+- [ ] Test passes: `python tests/simple_usb_mdb_test.py`
+
+### **Traditional Pi HAT** ✅  
+- [ ] Same UART setup as Hybrid
 - [ ] GPIO6 accessible
 - [ ] Test passes: `python tests/mdb_troubleshoot.py`
 
@@ -327,4 +482,4 @@ Once MDB setup is complete:
 3. **Test Vending Operations**: Try coin insertion and vending
 4. **Monitor Logs**: Watch `logs/vending_machine.log`
 
-The new USB interface approach is **recommended** for new installations due to its simplicity and reliability. 
+The Hybrid Pi HAT approach is **recommended** for new installations due to its combination of GPIO control and simple text-based commands. 
