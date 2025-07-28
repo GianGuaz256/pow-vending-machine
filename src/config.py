@@ -24,9 +24,9 @@ class DisplayConfig:
 @dataclass
 class MDBConfig:
     """MDB board configuration"""
-    serial_port: str = os.getenv("MDB_SERIAL_PORT", "/dev/ttyAMA0")
-    baud_rate: int = int(os.getenv("MDB_BAUD_RATE", "38400"))  # Qibixx MDB Pi HAT detected at 38400 baud
-    timeout: float = 1.0
+    serial_port: str = os.getenv("MDB_SERIAL_PORT", "/dev/ttyACM0")  # USB interface
+    baud_rate: int = int(os.getenv("MDB_BAUD_RATE", "115200"))  # USB interface baud rate
+    timeout: float = 50.0  # High timeout as specified in the guide
     retry_attempts: int = 3
     
 @dataclass
