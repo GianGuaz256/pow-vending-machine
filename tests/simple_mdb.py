@@ -1,12 +1,18 @@
 """
 Enhanced Simple MDB Test
-Low-level MDB hardware communication test with comprehensive logging
+Text-based MDB communication test for Hybrid Pi HAT setup
 """
 import serial
 import time
 import logging
 import os
 import sys
+
+# Add project root to path for imports
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(project_root, 'src'))
+
+from config import config
 
 # Set up enhanced logging
 logging.basicConfig(
@@ -22,11 +28,16 @@ logger = logging.getLogger(__name__)
 def test_serial_ports():
     """Test available serial ports"""
     logger.info("="*50)
-    logger.info("SIMPLE MDB HARDWARE TEST")
+    logger.info("SIMPLE MDB HARDWARE TEST - HYBRID PI HAT")
     logger.info("="*50)
     
-    # Common MDB serial ports
-    test_ports = ['/dev/ttyAMA0', '/dev/ttyUSB0', '/dev/ttyS0', '/dev/mdb0']
+    # Check configured port
+    if os.path.exists(config.mdb.serial_port):
+        logger.info(f"✓ Configured port {config.mdb.serial_port} exists")
+        return config.mdb.serial_port
+    
+    # Common MDB serial ports as fallback
+    test_ports = ['/dev/ttyAMA0', '/dev/ttyUSB0', '/dev/ttyACM0', '/dev/ttyS0']
     
     logger.info("Checking for available serial ports...")
     available_ports = []
@@ -51,127 +62,93 @@ def test_serial_ports():
     return available_ports[0]  # Use first available port
 
 def test_mdb_communication(port):
-    """Test basic MDB communication"""
+    """Test MDB communication using text commands (Hybrid Pi HAT)"""
     logger.info(f"Testing MDB communication on {port}")
     
-    # Common MDB baud rates to try
-    baud_rates = [9600, 19200, 38400, 115200]
+    # Test text-based commands at 115200 baud (your working setup)
+    logger.info("Testing Hybrid Pi HAT setup: 115200 baud with text commands")
     
-    for baud_rate in baud_rates:
-        logger.info(f"Trying baud rate: {baud_rate}")
+    try:
+        # Open serial connection with your working parameters
+        logger.debug(f"Opening serial port {port} at 115200 baud")
+        ser = serial.Serial(
+            port=port,
+            baudrate=115200,  # Your working baud rate
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=50.0  # High timeout like your setup
+        )
         
-        try:
-            # Open serial connection
-            logger.debug(f"Opening serial port {port} at {baud_rate} baud")
-            ser = serial.Serial(
-                port=port,
-                baudrate=baud_rate,
-                bytesize=serial.EIGHTBITS,
-                parity=serial.PARITY_NONE,
-                stopbits=serial.STOPBITS_ONE,
-                timeout=2.0
-            )
-            
-            logger.info(f"Serial port opened successfully")
-            logger.debug(f"Port settings: {ser.get_settings()}")
-            
-            # Clear any existing data
-            ser.flushInput()
-            ser.flushOutput()
-            time.sleep(0.1)
-            
-            # Track if we get any responses
-            response_received = False
-            
-            # Test 1: Send RESET command
-            logger.info("Test 1: Sending RESET command (0x00)")
-            reset_cmd = b'\x00'
-            ser.write(reset_cmd)
-            logger.debug(f"Sent: {reset_cmd.hex()}")
+        logger.info(f"Serial port opened successfully")
+        logger.debug(f"Port settings: {ser.get_settings()}")
+        
+        # Clear any existing data
+        ser.reset_input_buffer()
+        ser.reset_output_buffer()
+        time.sleep(0.1)
+        
+        # Track if we get any responses
+        response_received = False
+        
+        # Test text commands (your working setup)
+        text_commands = [
+            ('V\n', 'VERSION'),
+            ('R\n', 'RESET'),
+            ('S\n', 'SETUP'), 
+            ('P\n', 'POLL'),
+            ('T\n', 'STATUS')
+        ]
+        
+        for cmd_text, cmd_name in text_commands:
+            logger.info(f"Test: Sending {cmd_name} command ('{cmd_text.strip()}')")
+            cmd_bytes = cmd_text.encode('ascii')
+            ser.write(cmd_bytes)
+            logger.debug(f"Sent: {cmd_bytes}")
             
             # Wait for response
             time.sleep(0.5)
             
             if ser.in_waiting > 0:
-                response = ser.read(ser.in_waiting)
-                logger.info(f"Received response: {response.hex()} ({len(response)} bytes)")
-                response_received = True
-                
-                # Check for ACK (0x00) or other expected responses
-                if response == b'\x00':
-                    logger.info("✓ Received ACK - MDB device responded correctly!")
+                response = ser.readline()
+                if response:
+                    response_text = response.decode('ascii').strip()
+                    logger.info(f"✓ Received response: '{response_text}'")
+                    response_received = True
+                    
+                    # Check for expected responses
+                    if cmd_name == 'VERSION' and response_text.startswith('v,'):
+                        logger.info("✓ Version response format correct!")
+                    elif 'NACK' in response_text.upper() or 'OK' in response_text.upper():
+                        logger.info("✓ Valid MDB response format!")
                 else:
-                    logger.info(f"Received non-ACK response: {response.hex()}")
+                    logger.warning(f"Empty response to {cmd_name} command")
             else:
-                logger.warning("No response received to RESET command")
+                logger.warning(f"No response to {cmd_name} command")
+        
+        ser.close()
+        
+        if response_received:
+            logger.info(f"✓ Successfully communicated with MDB device on {port} using text commands")
+            return True
+        else:
+            logger.warning(f"✗ No responses received from MDB device")
+            return False
             
-            # Test 2: Send SETUP command
-            logger.info("Test 2: Sending SETUP command (0x01)")
-            setup_cmd = b'\x01'
-            ser.write(setup_cmd)
-            logger.debug(f"Sent: {setup_cmd.hex()}")
-            
-            time.sleep(0.5)
-            
-            if ser.in_waiting > 0:
-                response = ser.read(ser.in_waiting)
-                logger.info(f"Setup response: {response.hex()} ({len(response)} bytes)")
-                response_received = True
-            else:
-                logger.warning("No response to SETUP command")
-            
-            # Test 3: Send STATUS request
-            logger.info("Test 3: Sending STATUS request (0x02)")
-            status_cmd = b'\x02'
-            ser.write(status_cmd)
-            logger.debug(f"Sent: {status_cmd.hex()}")
-            
-            time.sleep(0.5)
-            
-            if ser.in_waiting > 0:
-                response = ser.read(ser.in_waiting)
-                logger.info(f"Status response: {response.hex()} ({len(response)} bytes)")
-                response_received = True
-            else:
-                logger.warning("No response to STATUS command")
-            
-            # Test 4: Check for any spontaneous data
-            logger.info("Test 4: Listening for spontaneous data...")
-            time.sleep(2.0)
-            
-            if ser.in_waiting > 0:
-                response = ser.read(ser.in_waiting)
-                logger.info(f"Spontaneous data: {response.hex()} ({len(response)} bytes)")
-                response_received = True
-            else:
-                logger.info("No spontaneous data received")
-            
+    except serial.SerialException as e:
+        logger.error(f"Serial error: {e}")
+        try:
             ser.close()
-            
-            # Only return True if we actually received responses from MDB device
-            if response_received:
-                logger.info(f"✓ Successfully communicated with MDB device on {port} at {baud_rate} baud")
-                return True
-            else:
-                logger.warning(f"✗ Serial port {port} opened but no MDB device responded at {baud_rate} baud")
-                # Continue to next baud rate
-                continue
-            
-        except serial.SerialException as e:
-            logger.error(f"Serial error at {baud_rate} baud: {e}")
-            try:
-                ser.close()
-            except:
-                pass
-        except Exception as e:
-            logger.error(f"Unexpected error at {baud_rate} baud: {e}")
-            try:
-                ser.close()
-            except:
-                pass
-    
-    logger.error(f"❌ Failed to communicate with MDB device on {port} - no responses received at any baud rate")
-    return False
+        except:
+            pass
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        try:
+            ser.close()
+        except:
+            pass
+        return False
 
 def check_permissions():
     """Check permissions for serial port access"""
@@ -206,11 +183,13 @@ def check_permissions():
 def main():
     """Main test function"""
     try:
-        logger.info("Starting simple MDB hardware test")
+        logger.info("Starting simple MDB hardware test for Hybrid Pi HAT")
         
         # Check system info
         logger.info(f"Python version: {sys.version}")
         logger.info(f"Working directory: {os.getcwd()}")
+        logger.info(f"Configured MDB port: {config.mdb.serial_port}")
+        logger.info(f"Configured baud rate: {config.mdb.baud_rate}")
         
         # Check permissions
         check_permissions()
@@ -225,6 +204,7 @@ def main():
             if success:
                 logger.info("🎉 MDB hardware test completed successfully!")
                 print("\n✓ MDB hardware test PASSED - check simple_mdb_test.log for details")
+                print("✓ Your Hybrid Pi HAT is working with text commands at 115200 baud")
             else:
                 logger.error("❌ MDB hardware test failed")
                 print("\n✗ MDB hardware test FAILED - check simple_mdb_test.log for details")

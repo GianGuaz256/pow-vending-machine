@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-MDB USB Interface Test
-Tests the MDB connection using the correct approach with USB interface
+MDB Hybrid Pi HAT Test
+Tests the MDB connection using text commands on GPIO UART
 """
 import serial
 import time
@@ -28,9 +28,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def test_usb_mdb_connection():
-    """Test MDB USB connection using the correct approach"""
+    """Test Hybrid MDB Pi HAT connection using text commands"""
     logger.info("="*60)
-    logger.info("MDB USB INTERFACE TEST - Correct Approach")
+    logger.info("HYBRID MDB PI HAT TEST - Text Commands")
     logger.info("="*60)
     
     # Check if device exists
@@ -91,7 +91,7 @@ def test_usb_mdb_connection():
                     logger.warning(f"  No response to {name} command")
             
             ser.close()
-            logger.info("✓ MDB USB Interface test completed successfully!")
+            logger.info("✓ Hybrid MDB Pi HAT test completed successfully!")
             return True
             
         else:
@@ -188,12 +188,13 @@ def check_permissions():
 
 def main():
     """Main test function"""
-    logger.info("Starting MDB Interface testing...")
+    logger.info("Starting Hybrid MDB Pi HAT testing...")
     
-    print("MDB INTERFACE TEST")
+    print("HYBRID MDB PI HAT TEST")
     print("="*50)
     print(f"Testing device: {config.mdb.serial_port}")
     print(f"Baud rate: {config.mdb.baud_rate}")
+    print("Setup: GPIO UART with text commands")
     
     # Test 1: Check permissions
     print("\n1. Checking permissions...")
@@ -216,7 +217,7 @@ def main():
     print(f"MDB Controller:  {'✓ PASS' if controller_ok else '✗ FAIL'}")
     
     if direct_ok and controller_ok:
-        print("\n🎉 All tests passed! MDB interface is working correctly.")
+        print("\n🎉 All tests passed! Hybrid MDB Pi HAT is working correctly.")
         return True
     elif direct_ok:
         print("\n⚠️ Direct connection works but controller has issues - check implementation.")
@@ -224,7 +225,7 @@ def main():
     else:
         print("\n❌ Tests failed - check hardware and configuration.")
         print(f"\nDevice being tested: {config.mdb.serial_port}")
-        print("Make sure your MDB device is connected and powered on.")
+        print("Make sure your Hybrid MDB Pi HAT is connected and powered on.")
         return False
 
 if __name__ == "__main__":

@@ -174,12 +174,13 @@ def test_mdb_communication_detailed(port):
     logger.info(f"DETAILED MDB TEST ON {port}")
     logger.info("="*60)
     
-    # Test multiple MDB protocols and baud rates (38400 first since detected working)
+    # Test Hybrid Pi HAT first (user's working setup), then fallbacks
     mdb_configs = [
-        {'baud': 38400, 'name': 'Qibixx MDB Pi HAT (detected)'},
-        {'baud': 115200, 'name': 'USB MDB Bridge'},
-        {'baud': 19200, 'name': 'Fast MDB'},
-        {'baud': 9600, 'name': 'Standard MDB'}
+        {'baud': 115200, 'name': 'Hybrid Pi HAT (text commands)', 'protocol': 'text'},
+        {'baud': 38400, 'name': 'Traditional Pi HAT (binary)', 'protocol': 'binary'},
+        {'baud': 115200, 'name': 'USB MDB Bridge (binary)', 'protocol': 'binary'},
+        {'baud': 19200, 'name': 'Fast MDB (binary)', 'protocol': 'binary'},
+        {'baud': 9600, 'name': 'Standard MDB (binary)', 'protocol': 'binary'}
     ]
     
     for config in mdb_configs:
@@ -192,7 +193,7 @@ def test_mdb_communication_detailed(port):
                 bytesize=8,
                 parity='N',
                 stopbits=1,
-                timeout=3.0,
+                timeout=50.0 if config['protocol'] == 'text' else 3.0,
                 write_timeout=1.0
             )
             
@@ -201,42 +202,85 @@ def test_mdb_communication_detailed(port):
             ser.reset_output_buffer()
             time.sleep(0.1)
             
-            # Try various MDB commands
-            test_commands = [
-                (b'\x00', 'RESET'),
-                (b'\x01', 'SETUP'), 
-                (b'\x02', 'STATUS'),
-                (b'\x08', 'POLL'),
-                (b'\x0F', 'EXPANSION ID'),
-            ]
-            
             responses_received = 0
             
-            for cmd, name in test_commands:
-                logger.info(f"  Sending {name} command: {cmd.hex()}")
+            if config['protocol'] == 'text':
+                # Test text commands (your working setup)
+                test_commands = [
+                    ('V\n', 'VERSION'),
+                    ('R\n', 'RESET'),
+                    ('S\n', 'SETUP'), 
+                    ('P\n', 'POLL'),
+                    ('T\n', 'STATUS')
+                ]
                 
-                try:
-                    ser.write(cmd)
-                    ser.flush()
-                    time.sleep(0.5)
+                for cmd_text, cmd_name in test_commands:
+                    logger.info(f"  Sending {cmd_name} command: '{cmd_text.strip()}'")
                     
-                    if ser.in_waiting > 0:
-                        response = ser.read(ser.in_waiting)
-                        logger.info(f"    Response: {response.hex()} ({len(response)} bytes)")
-                        responses_received += 1
-                    else:
-                        logger.info(f"    No response")
+                    try:
+                        ser.write(cmd_text.encode('ascii'))
+                        ser.flush()
+                        time.sleep(0.5)
                         
-                except Exception as e:
-                    logger.warning(f"    Error sending command: {e}")
+                        if ser.in_waiting > 0:
+                            response = ser.readline()
+                            if response:
+                                response_text = response.decode('ascii', errors='ignore').strip()
+                                logger.info(f"    Response: '{response_text}'")
+                                responses_received += 1
+                                
+                                # Check for expected patterns
+                                if cmd_name == 'VERSION' and response_text.startswith('v,'):
+                                    logger.info(f"    ✓ Valid version format!")
+                                elif 'NACK' in response_text.upper() or 'OK' in response_text.upper():
+                                    logger.info(f"    ✓ Valid MDB response!")
+                            else:
+                                logger.info(f"    Empty response")
+                        else:
+                            logger.info(f"    No response")
+                            
+                    except Exception as e:
+                        logger.warning(f"    Error sending {cmd_name}: {e}")
+                        continue
+            
+            else:
+                # Test binary commands (fallback for other setups)
+                test_commands = [
+                    (b'\x00', 'RESET'),
+                    (b'\x01', 'SETUP'), 
+                    (b'\x02', 'STATUS'),
+                    (b'\x08', 'POLL'),
+                    (b'\x0F', 'EXPANSION ID'),
+                ]
+                
+                for cmd_bytes, cmd_name in test_commands:
+                    logger.info(f"  Sending {cmd_name} command: {cmd_bytes.hex()}")
+                    
+                    try:
+                        ser.write(cmd_bytes)
+                        ser.flush()
+                        time.sleep(0.5)
+                        
+                        if ser.in_waiting > 0:
+                            response = ser.read(ser.in_waiting)
+                            logger.info(f"    Response: {response.hex()} ({len(response)} bytes)")
+                            responses_received += 1
+                        else:
+                            logger.info(f"    No response")
+                            
+                    except Exception as e:
+                        logger.warning(f"    Error sending {cmd_name}: {e}")
+                        continue
             
             ser.close()
             
             if responses_received > 0:
                 logger.info(f"✓ Received {responses_received} responses - MDB device detected!")
+                if config['protocol'] == 'text':
+                    logger.info(f"✓ Your device uses TEXT COMMANDS (Hybrid Pi HAT setup)")
                 return True
             else:
-                logger.warning(f"✗ No responses received at {config['baud']} baud")
+                logger.warning(f"✗ No responses received at {config['baud']} baud ({config['protocol']})")
                 
         except Exception as e:
             logger.error(f"  Failed to test {config['name']}: {e}")

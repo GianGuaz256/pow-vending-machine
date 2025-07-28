@@ -1,6 +1,6 @@
 """
-MDB Controller for Qibixx MDB USB Interface
-Handles communication with the vending machine MDB board using USB interface
+MDB Controller for Qibixx Hybrid MDB Pi HAT
+Handles communication with the vending machine MDB board using GPIO with text commands
 """
 import serial
 import time
@@ -13,7 +13,7 @@ from config import config
 logger = logging.getLogger(__name__)
 
 class MDBCommand(Enum):
-    """MDB text command constants for USB interface"""
+    """MDB text command constants for Hybrid Pi HAT"""
     VERSION = "V"
     RESET = "R"
     SETUP = "S"
@@ -34,7 +34,7 @@ class VendState(Enum):
     ERROR = "error"
 
 class MDBController:
-    """Controller for MDB communication via Qibixx MDB USB Interface"""
+    """Controller for MDB communication via Qibixx Hybrid MDB Pi HAT"""
     
     def __init__(self):
         self.serial_port = None
@@ -47,12 +47,12 @@ class MDBController:
         self.device_info = {}
         
     def initialize(self) -> bool:
-        """Initialize MDB USB connection"""
+        """Initialize Hybrid MDB Pi HAT connection"""
         try:
-            logger.info("Initializing Qibixx MDB USB Interface connection...")
+            logger.info("Initializing Qibixx Hybrid MDB Pi HAT connection...")
             
-            # Qibixx MDB USB Interface parameters:
-            # Baudrate: 115200, Parity: None, Data Bits: 8, Stop Bits: 1
+            # Qibixx Hybrid MDB Pi HAT parameters:
+            # Hardware: GPIO UART, Commands: Text-based, Baudrate: 115200
             self.serial_port = serial.Serial()
             self.serial_port.baudrate = 115200
             self.serial_port.timeout = 50  # High timeout as specified
@@ -65,7 +65,7 @@ class MDBController:
             self.serial_port.open()
             
             # Allow interface time to stabilize
-            logger.info("Allowing MDB USB interface to stabilize...")
+            logger.info("Allowing Hybrid MDB Pi HAT to stabilize...")
             time.sleep(1.0)
             
             # Test connection with version command
@@ -73,10 +73,10 @@ class MDBController:
                 self.is_connected = True
                 self.state = VendState.ENABLED
                 self._start_polling()
-                logger.info(f"✓ Qibixx MDB USB Interface initialized successfully on {config.mdb.serial_port}")
+                logger.info(f"✓ Qibixx Hybrid MDB Pi HAT initialized successfully on {config.mdb.serial_port}")
                 return True
             else:
-                logger.error("Failed to establish communication with Qibixx MDB USB Interface")
+                logger.error("Failed to establish communication with Qibixx Hybrid MDB Pi HAT")
                 return False
                 
         except Exception as e:
@@ -86,12 +86,12 @@ class MDBController:
             return False
     
     def _test_connection(self) -> bool:
-        """Test connection to Qibixx MDB USB Interface using version command"""
+        """Test connection to Qibixx Hybrid MDB Pi HAT using version command"""
         if not self.serial_port or not self.serial_port.is_open:
             return False
             
         try:
-            logger.info("Testing MDB USB connection with version command...")
+            logger.info("Testing Hybrid MDB Pi HAT connection with version command...")
             
             with self._lock:
                 # Clear buffers
@@ -108,11 +108,11 @@ class MDBController:
                 
                 if response:
                     version_info = response.decode('ascii').strip()
-                    logger.info(f"✓ MDB USB Interface Version: {version_info}")
+                    logger.info(f"✓ Hybrid MDB Pi HAT Version: {version_info}")
                     
                     # Store device information
                     self.device_info['version'] = version_info
-                    self.device_info['connection_type'] = 'USB'
+                    self.device_info['connection_type'] = 'Hybrid Pi HAT'
                     self.device_info['baudrate'] = 115200
                     
                     return True
@@ -121,11 +121,11 @@ class MDBController:
                     return False
                     
         except Exception as e:
-            logger.error(f"Failed to test MDB USB connection: {e}")
+            logger.error(f"Failed to test Hybrid MDB Pi HAT connection: {e}")
             return False
     
     def _send_command(self, command: str, data: str = '') -> Optional[str]:
-        """Send text command to Qibixx MDB USB Interface"""
+        """Send text command to Qibixx Hybrid MDB Pi HAT"""
         if not self.serial_port or not self.serial_port.is_open:
             return None
             
@@ -146,7 +146,7 @@ class MDBController:
                 return None
                 
         except Exception as e:
-            logger.error(f"Failed to send command to MDB USB interface: {e}")
+            logger.error(f"Failed to send command to Hybrid MDB Pi HAT: {e}")
             return None
     
     def _start_polling(self):
@@ -169,7 +169,7 @@ class MDBController:
                 time.sleep(2.0)
     
     def _poll_device(self):
-        """Poll MDB USB Interface for status updates"""
+        """Poll Hybrid MDB Pi HAT for status updates"""
         try:
             # Send POLL command
             response = self._send_command(MDBCommand.POLL.value)
@@ -177,7 +177,7 @@ class MDBController:
                 self._process_poll_response(response)
                     
         except Exception as e:
-            logger.error(f"Error polling MDB USB interface: {e}")
+            logger.error(f"Error polling Hybrid MDB Pi HAT: {e}")
     
     def _process_poll_response(self, response: str):
         """Process poll response from MDB device"""
@@ -322,7 +322,7 @@ class MDBController:
             return None
     
     def check_connection(self) -> bool:
-        """Check if MDB USB Interface connection is healthy"""
+        """Check if Hybrid MDB Pi HAT connection is healthy"""
         try:
             if not self.serial_port or not self.serial_port.is_open:
                 self.is_connected = False
@@ -340,7 +340,7 @@ class MDBController:
                 return False
                         
         except Exception as e:
-            logger.error(f"MDB connection check failed: {e}")
+            logger.error(f"Hybrid MDB Pi HAT connection check failed: {e}")
             self.is_connected = False
             return False
     
