@@ -33,14 +33,15 @@ def test_usb_mdb_connection():
     logger.info("MDB USB INTERFACE TEST - Correct Approach")
     logger.info("="*60)
     
-    # Check if USB device exists
+    # Check if device exists
     if not os.path.exists(config.mdb.serial_port):
-        logger.error(f"USB device {config.mdb.serial_port} does not exist!")
-        logger.info("Available /dev/ttyACM* devices:")
+        logger.error(f"Device {config.mdb.serial_port} does not exist!")
+        logger.info("Available serial devices:")
         import glob
-        acm_devices = glob.glob('/dev/ttyACM*')
-        for device in acm_devices:
-            logger.info(f"  Found: {device}")
+        for pattern in ['/dev/ttyACM*', '/dev/ttyAMA*', '/dev/ttyUSB*']:
+            devices = glob.glob(pattern)
+            for device in devices:
+                logger.info(f"  Found: {device}")
         return False
     
     try:
@@ -52,7 +53,7 @@ def test_usb_mdb_connection():
         ser = serial.Serial()
         ser.baudrate = 115200  # Set the appropriate BaudRate
         ser.timeout = 50  # The maximum timeout that the program waits for a reply
-        ser.port = '/dev/ttyACM0'  # Specify the device file descriptor
+        ser.port = config.mdb.serial_port  # Use configured device file descriptor
         
         logger.info("Opening serial connection...")
         ser.open()  # Open the serial connection
@@ -149,9 +150,9 @@ def test_with_mdb_controller():
         return False
 
 def check_permissions():
-    """Check permissions for USB device access"""
+    """Check permissions for device access"""
     logger.info("="*60)
-    logger.info("CHECKING USB DEVICE PERMISSIONS")
+    logger.info("CHECKING DEVICE PERMISSIONS")
     logger.info("="*60)
     
     try:
@@ -187,17 +188,19 @@ def check_permissions():
 
 def main():
     """Main test function"""
-    logger.info("Starting MDB USB Interface testing...")
+    logger.info("Starting MDB Interface testing...")
     
-    print("MDB USB INTERFACE TEST")
+    print("MDB INTERFACE TEST")
     print("="*50)
+    print(f"Testing device: {config.mdb.serial_port}")
+    print(f"Baud rate: {config.mdb.baud_rate}")
     
     # Test 1: Check permissions
     print("\n1. Checking permissions...")
     perm_ok = check_permissions()
     
-    # Test 2: Direct USB test
-    print("\n2. Testing direct USB connection...")
+    # Test 2: Direct connection test
+    print("\n2. Testing direct connection...")
     direct_ok = test_usb_mdb_connection()
     
     # Test 3: MDB Controller test
@@ -209,23 +212,19 @@ def main():
     print("TEST SUMMARY")
     print("="*50)
     print(f"Permissions:     {'✓ PASS' if perm_ok else '✗ FAIL'}")
-    print(f"Direct USB:      {'✓ PASS' if direct_ok else '✗ FAIL'}")
+    print(f"Direct Test:     {'✓ PASS' if direct_ok else '✗ FAIL'}")
     print(f"MDB Controller:  {'✓ PASS' if controller_ok else '✗ FAIL'}")
     
     if direct_ok and controller_ok:
-        print("\n🎉 All tests passed! MDB USB interface is working correctly.")
+        print("\n🎉 All tests passed! MDB interface is working correctly.")
         return True
     elif direct_ok:
-        print("\n⚠️ Direct USB works but controller has issues - check implementation.")
+        print("\n⚠️ Direct connection works but controller has issues - check implementation.")
         return False
     else:
         print("\n❌ Tests failed - check hardware and configuration.")
-        print("\nTroubleshooting steps:")
-        print("1. Verify USB MDB device is connected")
-        print("2. Check /dev/ttyACM0 exists")
-        print("3. Add user to dialout group: sudo usermod -a -G dialout $USER")
-        print("4. Logout and login again")
-        print("5. Check device permissions")
+        print(f"\nDevice being tested: {config.mdb.serial_port}")
+        print("Make sure your MDB device is connected and powered on.")
         return False
 
 if __name__ == "__main__":

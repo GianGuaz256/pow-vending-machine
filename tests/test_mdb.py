@@ -183,8 +183,8 @@ class MDBTestSuite:
             # Test configuration values
             config_tests = [
                 ("Serial Port", config.mdb.serial_port, lambda x: x and isinstance(x, str)),
-                ("Baud Rate", config.mdb.baud_rate, lambda x: x in [9600, 19200, 38400]),
-                ("Timeout", config.mdb.timeout, lambda x: 0.1 <= x <= 10.0),
+                ("Baud Rate", config.mdb.baud_rate, lambda x: x in [9600, 19200, 38400, 115200]),
+                ("Timeout", config.mdb.timeout, lambda x: 0.1 <= x <= 60.0),
                 ("Retry Attempts", config.mdb.retry_attempts, lambda x: 1 <= x <= 10)
             ]
             

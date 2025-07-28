@@ -2,14 +2,15 @@
 
 Complete guide for setting up MDB interfaces with your Raspberry Pi for the POW Vending Machine project.
 
-This guide covers both **Qibixx MDB Pi HAT** (GPIO-based) and **Qibixx MDB USB Interface** approaches.
+This guide covers **Qibixx MDB Pi HAT** (GPIO-based), **Qibixx MDB USB Interface**, and **Hybrid Pi HAT** approaches.
 
 ## 📋 Prerequisites
 
-- Raspberry Pi 4 Model B with Raspberry Pi OS
-- **Either:**
+- Raspberry Pi 4/5 Model B with Raspberry Pi OS
+- **One of:**
   - Qibixx MDB Pi HAT v4.0.2+ (GPIO-based)
-  - **OR** Qibixx MDB USB Interface (USB-based) **← RECOMMENDED**
+  - Qibixx MDB USB Interface (USB-based)
+  - **Hybrid Pi HAT** (GPIO hardware with USB-style commands) **← YOUR SETUP**
 - MDB-compatible vending machine or bill acceptor
 - SD card with fresh Raspberry Pi OS installation
 - SSH or direct access to the Pi
@@ -18,19 +19,24 @@ This guide covers both **Qibixx MDB Pi HAT** (GPIO-based) and **Qibixx MDB USB I
 
 ## 🔄 **Choose Your MDB Interface Type**
 
-### **Option A: USB Interface (RECOMMENDED)**
+### **Option A: USB Interface**
 - **Port:** `/dev/ttyACM0`
 - **Baud Rate:** 115200
 - **Commands:** Text-based (`V\n`, `R\n`, etc.)
 - **Connection:** USB cable
-- **Advantages:** Easier setup, no GPIO configuration needed
 
-### **Option B: Pi HAT Interface (Legacy)**
+### **Option B: Hybrid Pi HAT (YOUR SETUP)** ⭐
+- **Port:** `/dev/ttyAMA0` (GPIO UART)  
+- **Baud Rate:** 115200
+- **Commands:** Text-based (`V\n`, `R\n`, etc.) **← Like USB but on GPIO**
+- **Connection:** GPIO pins
+- **Advantages:** Best of both worlds - GPIO control with simple text commands
+
+### **Option C: Traditional Pi HAT**
 - **Port:** `/dev/ttyAMA0`  
 - **Baud Rate:** 38400 (auto-detected)
 - **Commands:** Binary MDB protocol
 - **Connection:** GPIO pins
-- **Advantages:** Direct GPIO control
 
 ---
 
@@ -68,6 +74,65 @@ This guide covers both **Qibixx MDB Pi HAT** (GPIO-based) and **Qibixx MDB USB I
 
 ## ⚙️ Software Configuration
 
+### **For Hybrid Pi HAT (YOUR SETUP)** ⭐
+
+Your setup uses a **Qibixx MDB Pi HAT** with **text-based commands** at **115200 baud** on `/dev/ttyAMA0`.
+
+#### 1. **Enable UART Communication**
+Edit the boot configuration:
+```bash
+sudo nano /boot/firmware/config.txt
+```
+
+Add these lines:
+```bash
+# Enable UART for MDB HAT
+enable_uart=1
+dtparam=uart=on
+dtparam=uart0=on
+
+# Disable Bluetooth to free up UART
+dtoverlay=disable-bt
+dtoverlay=uart0
+```
+
+#### 2. **Disable Serial Console**
+```bash
+sudo nano /boot/firmware/cmdline.txt
+```
+
+Remove these parts if present:
+```bash
+console=serial0,115200 console=ttyAMA0,115200
+```
+
+#### 3. **Configure Environment**
+Create/edit `.env` file:
+```bash
+nano .env
+```
+
+Add your hybrid configuration:
+```bash
+# Hybrid Pi HAT Configuration (GPIO + Text Commands)
+MDB_SERIAL_PORT=/dev/ttyAMA0
+MDB_BAUD_RATE=115200
+MDB_TIMEOUT=50.0
+```
+
+#### 4. **Set Permissions**
+```bash
+# Add user to dialout group
+sudo usermod -a -G dialout $USER
+
+# Logout and login again for changes to take effect
+```
+
+#### 5. **Reboot**
+```bash
+sudo reboot
+```
+
 ### **For USB Interface (Option A)**
 
 #### 1. **Install Dependencies**
@@ -98,72 +163,59 @@ sudo usermod -a -G dialout $USER
 # Logout and login again for changes to take effect
 ```
 
-### **For Pi HAT (Option B)**
-
-#### 1. **Enable UART Communication**
-Edit the boot configuration:
-```bash
-sudo nano /boot/firmware/config.txt
-```
-
-Add these lines:
-```bash
-# Enable UART for MDB HAT
-enable_uart=1
-dtparam=uart=on
-dtparam=uart0=on
-
-# Disable Bluetooth to free up UART
-dtoverlay=disable-bt
-dtoverlay=uart0
-
-# Enable SPI for potential LCD use
-dtparam=spi=on
-```
-
-#### 2. **Disable Serial Console**
-```bash
-sudo nano /boot/firmware/cmdline.txt
-```
-
-Remove these parts if present:
-```bash
-console=serial0,115200 console=ttyAMA0,115200
-```
-
-#### 3. **Configure Environment**
-```bash
-# MDB Pi HAT Configuration
-MDB_SERIAL_PORT=/dev/ttyAMA0
-MDB_BAUD_RATE=38400
-MDB_TIMEOUT=1.0
-```
-
-#### 4. **Reboot**
-```bash
-sudo reboot
-```
+### **For Traditional Pi HAT (Option C)**
 
 ---
 
 ## 🧪 Testing and Verification
 
+### **Test Your Hybrid Pi HAT Setup** ⭐
+
+Your device should now be working! Run these tests:
+
+#### **Quick Test (User's Exact Method)**
+```bash
+cd ~/pow-vending-machine
+source venv/bin/activate
+python tests/simple_usb_mdb_test.py
+```
+
+**Expected output:**
+```
+Version: v,4.0.2.0,7de04655363231164c343132
+✓ SUCCESS: MDB interface is working!
+```
+
+#### **Comprehensive Test**
+```bash
+python tests/mdb_usb_test.py
+```
+
+**Expected output:**
+```
+🎉 All tests passed! MDB interface is working correctly.
+```
+
+#### **Manual Test with Minicom**
+```bash
+sudo minicom -b 115200 -D /dev/ttyAMA0
+```
+
+Type `V` and press Enter. You should see:
+```
+v,4.0.2.0,7de04655363231164c343132
+```
+
 ### **Test USB Interface**
 
-Run the new USB-specific test:
+Run the USB-specific test:
 ```bash
 cd ~/pow-vending-machine
 source venv/bin/activate
 python tests/mdb_usb_test.py
 ```
 
-**Expected output:**
-```
-✓ SUCCESS: Version: [Device Version Info]
-🎉 All tests passed! MDB USB interface is working correctly.
-```
-
-### **Test Pi HAT Interface**
+### **Test Traditional Pi HAT**
 
 Run the HAT-specific test:
 ```bash

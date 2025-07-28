@@ -5,18 +5,28 @@ Tests MDB connection using the exact approach provided by the user
 """
 
 import serial
+import os
+import sys
+
+# Add project root to path for imports
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(project_root, 'src'))
+
+from config import config
 
 def main():
-    """Test MDB USB connection exactly as specified by user"""
-    print("Simple USB MDB Test - User's Exact Example")
+    """Test MDB connection exactly as specified by user"""
+    print("Simple MDB Test - User's Exact Example")
     print("="*50)
+    print(f"Device: {config.mdb.serial_port}")
+    print(f"Baud Rate: {config.mdb.baud_rate}")
     
     try:
-        # User's exact implementation
+        # User's exact implementation but with configured port
         ser = serial.Serial() #Create Serial Object
         ser.baudrate = 115200 #Set the appropriate BaudRate
         ser.timeout = 50 #The maximum timeout that the program waits for a reply. If 0 is used, the pot is blocked until readline returns
-        ser.port = '/dev/ttyACM0' # Specify the device file descriptor
+        ser.port = config.mdb.serial_port # Use configured device file descriptor
         ser.open() #Open the serial connection
         ser.write(b'V\n') #Write the version command "V\n" encoded in Binary
         s = ser.readline() # Read the response
@@ -41,16 +51,16 @@ def main():
                 print(f"  No response")
         
         ser.close()
-        print("\n✓ SUCCESS: MDB USB interface is working!")
+        print("\n✓ SUCCESS: MDB interface is working!")
         return True
         
     except Exception as e:
         print(f"\n✗ ERROR: {e}")
         print("\nTroubleshooting:")
-        print("1. Check that /dev/ttyACM0 exists: ls -la /dev/ttyACM*")
+        print(f"1. Check that {config.mdb.serial_port} exists")
         print("2. Add user to dialout group: sudo usermod -a -G dialout $USER")
         print("3. Logout and login again")
-        print("4. Verify USB MDB device is connected")
+        print("4. Verify MDB device is connected and powered")
         return False
 
 if __name__ == "__main__":
